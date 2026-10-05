@@ -34,6 +34,7 @@
 #include "main.h"
 #include "ili9341.h"
 #include "gfx01m2_conf.h"
+#include "anim.h"
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
@@ -51,6 +52,7 @@ static void Demo_Joystick(void);
 /*EDITED by Milad*******************************/
 
    static void Demo_Bitmap(void);
+   static void Demo_Anim(void);
 
 /*EDITED by Milad*******************************/
 
@@ -116,7 +118,8 @@ int main(void)
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
     HAL_Delay(3000);
 /*MIIIIIIIIIIIILAD*/
-
+    Demo_Anim();
+    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
     Demo_Joystick();
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
   }
@@ -208,6 +211,87 @@ static void Demo_Text(void)
      ILI9341_DrawBitmap(96, 100, TEST_IMG_W, TEST_IMG_H, test_img);
      ILI9341_DrawString(10, 170, "RED/GRN/BLU, WHITE TOP-LEFT", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
    }
+
+/**
+  * @brief  Tests the animation engine for 10 s with placeholder frames:
+  *         a looping "idle" bounce, and a one-shot "feed" animation
+  *         started by pressing the joystick center.
+  */
+#define PH_W 32U
+#define PH_H 32U
+static uint16_t ph_frames[7][PH_W * PH_H];   /* static: 1 KB stack */
+
+static void Placeholder_Make(uint16_t *buf, uint16_t fg, uint16_t box_y)
+{
+  uint16_t x, y;
+
+  for (y = 0; y < PH_H; y++)
+  {
+    for (x = 0; x < PH_W; x++)
+    {
+      uint8_t in_box = (x >= 10U) && (x < 22U) && (y >= box_y) && (y < (uint16_t)(box_y + 12U));
+      buf[y * PH_W + x] = in_box ? fg : ILI9341_COLOR_BLACK;
+    }
+  }
+}
+
+static void Demo_Anim(void)
+{
+  static const uint16_t *idle_f[4];
+  static const uint16_t *feed_f[3];
+  static Animation idle_a, feed_a;
+  static const uint16_t idle_y[4] = { 4U, 10U, 16U, 10U };
+  uint32_t start = HAL_GetTick();
+  uint8_t prev_joy = 0;
+  uint8_t i;
+
+  /* Build placeholder frames: green bouncing box, then yellow/orange/red */
+  for (i = 0; i < 4U; i++)
+  {
+    Placeholder_Make(ph_frames[i], ILI9341_COLOR_GREEN, idle_y[i]);
+    idle_f[i] = ph_frames[i];
+  }
+  Placeholder_Make(ph_frames[4], ILI9341_COLOR_YELLOW, 10U);
+  Placeholder_Make(ph_frames[5], ILI9341_COLOR_ORANGE, 10U);
+  Placeholder_Make(ph_frames[6], ILI9341_COLOR_RED,    10U);
+  for (i = 0; i < 3U; i++)
+  {
+    feed_f[i] = ph_frames[4 + i];
+  }
+
+  idle_a.frames = idle_f; idle_a.count = 4U; idle_a.frame_ms = 250U; idle_a.loop = true;
+  feed_a.frames = feed_f; feed_a.count = 3U; feed_a.frame_ms = 200U; feed_a.loop = false;
+
+  ILI9341_FillScreen(ILI9341_COLOR_BLACK);
+  ILI9341_DrawString(10, 10, "ANIM TEST", ILI9341_COLOR_WHITE, ILI9341_COLOR_BLACK, 2);
+  ILI9341_DrawString(10, 40, "PRESS CENTER = FEED", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
+
+  Anim_Init(104, 140, PH_W, PH_H);
+  Anim_Register(ANIM_IDLE, &idle_a);
+  Anim_Register(ANIM_FEED, &feed_a);
+  Anim_Play(ANIM_IDLE);
+
+  /* Non-blocking loop: input is checked on every pass, even mid-animation */
+  while ((HAL_GetTick() - start) < 10000U)
+  {
+    uint8_t joy = Joystick_Read();
+
+    if ((joy & JOY_CENTER_MASK) && !(prev_joy & JOY_CENTER_MASK))
+    {
+      Anim_Play(ANIM_FEED);            /* react on the press, not while held */
+    }
+    prev_joy = joy;
+
+    if ((Anim_Current() == ANIM_FEED) && Anim_IsFinished())
+    {
+      Anim_Play(ANIM_IDLE);            /* one-shot done: back to idle */
+    }
+
+    Anim_Update(HAL_GetTick());
+  }
+}
+
+
 
 /**
   * @brief  Live joystick (B1) status readout for a few seconds.
