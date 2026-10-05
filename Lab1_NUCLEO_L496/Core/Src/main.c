@@ -48,6 +48,12 @@ static void Demo_Shapes(void);
 static void Demo_Text(void);
 static void Demo_Joystick(void);
 
+/*EDITED by Milad*******************************/
+
+   static void Demo_Bitmap(void);
+
+/*EDITED by Milad*******************************/
+
 /* Joystick (B1) bit flags returned by Joystick_Read() */
 #define JOY_LEFT_MASK   (1U << 0)
 #define JOY_CENTER_MASK (1U << 1)
@@ -105,6 +111,11 @@ int main(void)
     Demo_Text();
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
     HAL_Delay(1500);
+/*MIIIIIIIIIIIILAD*/
+    Demo_Bitmap();
+    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+    HAL_Delay(3000);
+/*MIIIIIIIIIIIILAD*/
 
     Demo_Joystick();
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
@@ -163,6 +174,40 @@ static void Demo_Text(void)
   ILI9341_DrawString(10, 145, "COLORS AND TEXT IN", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
   ILI9341_DrawString(10, 160, "DEMO TEXT() IN MAIN.C", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
 }
+
+/*MIIIIIIIIIIIIIIIIIIIIIIIIIIIIIILAD*/
+
+   /**
+     * @brief  Tests ILI9341_DrawBitmap with a generated 48x48 image:
+     *         red, green and blue stripes, plus a white square in the
+     *         top-left corner to check orientation.
+     */
+   #define TEST_IMG_W 48U
+   #define TEST_IMG_H 48U
+   static uint16_t test_img[TEST_IMG_W * TEST_IMG_H];  /* static: 1 KB stack */
+
+   static void Demo_Bitmap(void)
+   {
+     uint16_t x, y;
+
+     for (y = 0; y < TEST_IMG_H; y++)
+     {
+       for (x = 0; x < TEST_IMG_W; x++)
+       {
+         uint16_t c;
+         if (y < 16U)      { c = ILI9341_COLOR_RED; }
+         else if (y < 32U) { c = ILI9341_COLOR_GREEN; }
+         else              { c = ILI9341_COLOR_BLUE; }
+         if ((x < 8U) && (y < 8U)) { c = ILI9341_COLOR_WHITE; }
+         test_img[y * TEST_IMG_W + x] = c;
+       }
+     }
+
+     ILI9341_FillScreen(ILI9341_COLOR_BLACK);
+     ILI9341_DrawString(10, 10, "BITMAP TEST", ILI9341_COLOR_WHITE, ILI9341_COLOR_BLACK, 2);
+     ILI9341_DrawBitmap(96, 100, TEST_IMG_W, TEST_IMG_H, test_img);
+     ILI9341_DrawString(10, 170, "RED/GRN/BLU, WHITE TOP-LEFT", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
+   }
 
 /**
   * @brief  Live joystick (B1) status readout for a few seconds.
