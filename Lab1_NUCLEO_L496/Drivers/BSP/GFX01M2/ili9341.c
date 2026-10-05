@@ -155,7 +155,44 @@ void ILI9341_FillRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t c
     }
     LCD_CS_High();
 }
+                 /* DRAWBITMAP MILAD**************************/
 
+   void ILI9341_DrawBitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *pixels)
+   {
+       /* static for the same reason as FillRect: the project stack is only 1 KB */
+       static uint8_t row_buf[ILI9341_WIDTH * 2];
+       const uint16_t src_w = w;   /* image width in memory, kept for row stride */
+       uint16_t row, col;
+
+       if ((pixels == NULL) || (w == 0U) || (h == 0U))   { return; }
+       if ((x >= ILI9341_WIDTH) || (y >= ILI9341_HEIGHT)) { return; }
+       if ((uint32_t)(x + w) > ILI9341_WIDTH)  { w = ILI9341_WIDTH - x; }
+       if ((uint32_t)(y + h) > ILI9341_HEIGHT) { h = ILI9341_HEIGHT - y; }
+
+       /* Set the window once for the whole image, then stream every pixel */
+       LCD_SetAddressWindow(x, y, x + w - 1, y + h - 1);
+
+       HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_SET);
+       LCD_CS_Low();
+       for (row = 0; row < h; row++)
+       {
+           const uint16_t *src = &pixels[(uint32_t)row * src_w];
+
+           /* The panel expects each pixel high byte first, but the MCU stores
+            * uint16_t little-endian, so split each pixel into two bytes here */
+           for (col = 0; col < w; col++)
+           {
+               row_buf[2 * col]     = (uint8_t)(src[col] >> 8);
+               row_buf[2 * col + 1] = (uint8_t)(src[col] & 0xFF);
+           }
+           HAL_SPI_Transmit(ili9341_hspi, row_buf, (uint16_t)(w * 2), HAL_MAX_DELAY);
+       }
+       LCD_CS_High();
+   }
+
+             /* DRAWBITMAP MILAD**************************/
+
+             
 void ILI9341_FillScreen(uint16_t color)
 {
     ILI9341_FillRect(0, 0, ILI9341_WIDTH, ILI9341_HEIGHT, color);
