@@ -18,7 +18,7 @@ import sys
 from PIL import Image
 
 GRID = 32          # design size
-SCALE = 2          # export scale -> 64x64
+SCALE = 1          # store at 32x32; the board enlarges it while drawing
 
 # ---- Colors (R, G, B). Avoid pure black inside the pet: the screen is black.
 PALETTE = {

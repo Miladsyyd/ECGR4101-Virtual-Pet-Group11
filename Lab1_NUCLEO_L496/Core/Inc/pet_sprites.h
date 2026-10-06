@@ -4,8 +4,8 @@
 
 #include <stdint.h>
 
-#define PET_SPRITES_WIDTH  64U
-#define PET_SPRITES_HEIGHT 64U
+#define PET_SPRITES_WIDTH  32U
+#define PET_SPRITES_HEIGHT 32U
 
 extern const uint16_t pet_death_0[PET_SPRITES_WIDTH * PET_SPRITES_HEIGHT];
 extern const uint16_t pet_death_1[PET_SPRITES_WIDTH * PET_SPRITES_HEIGHT];
