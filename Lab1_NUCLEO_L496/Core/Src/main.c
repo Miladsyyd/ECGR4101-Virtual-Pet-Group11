@@ -34,6 +34,9 @@
 #include "main.h"
 #include "ili9341.h"
 #include "gfx01m2_conf.h"
+#include "anim.h"
+#include "pet_anims.h"
+#include "pet_sprites.h"
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
@@ -47,6 +50,13 @@ static void Demo_ColorBars(void);
 static void Demo_Shapes(void);
 static void Demo_Text(void);
 static void Demo_Joystick(void);
+
+/*EDITED by Milad*******************************/
+
+   static void Demo_Bitmap(void);
+   static void Demo_Anim(void);
+
+/*EDITED by Milad*******************************/
 
 /* Joystick (B1) bit flags returned by Joystick_Read() */
 #define JOY_LEFT_MASK   (1U << 0)
@@ -105,7 +115,13 @@ int main(void)
     Demo_Text();
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
     HAL_Delay(1500);
-
+/*MIIIIIIIIIIIILAD*/
+    Demo_Bitmap();
+    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+    HAL_Delay(3000);
+/*MIIIIIIIIIIIILAD*/
+    Demo_Anim();
+    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
     Demo_Joystick();
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
   }
@@ -163,6 +179,84 @@ static void Demo_Text(void)
   ILI9341_DrawString(10, 145, "COLORS AND TEXT IN", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
   ILI9341_DrawString(10, 160, "DEMO TEXT() IN MAIN.C", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
 }
+
+/*MIIIIIIIIIIIIIIIIIIIIIIIIIIIIIILAD*/
+
+   /**
+     * @brief  Tests ILI9341_DrawBitmap with a generated 48x48 image:
+     *         red, green and blue stripes, plus a white square in the
+     *         top-left corner to check orientation.
+     */
+   #define TEST_IMG_W 48U
+   #define TEST_IMG_H 48U
+   static uint16_t test_img[TEST_IMG_W * TEST_IMG_H];  /* static: 1 KB stack */
+
+   static void Demo_Bitmap(void)
+   {
+     uint16_t x, y;
+
+     for (y = 0; y < TEST_IMG_H; y++)
+     {
+       for (x = 0; x < TEST_IMG_W; x++)
+       {
+         uint16_t c;
+         if (y < 16U)      { c = ILI9341_COLOR_RED; }
+         else if (y < 32U) { c = ILI9341_COLOR_GREEN; }
+         else              { c = ILI9341_COLOR_BLUE; }
+         if ((x < 8U) && (y < 8U)) { c = ILI9341_COLOR_WHITE; }
+         test_img[y * TEST_IMG_W + x] = c;
+       }
+     }
+
+     ILI9341_FillScreen(ILI9341_COLOR_BLACK);
+     ILI9341_DrawString(10, 10, "BITMAP TEST", ILI9341_COLOR_WHITE, ILI9341_COLOR_BLACK, 2);
+     ILI9341_DrawBitmap(96, 100, TEST_IMG_W, TEST_IMG_H, test_img);
+     ILI9341_DrawString(10, 170, "RED/GRN/BLU, WHITE TOP-LEFT", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
+   }
+
+
+   /**
+  * @brief  Shows the real pet for 20 s. Idle by default; joystick:
+  *         CENTER = feed, RIGHT = play, LEFT = sleep,
+  *         UP = runaway, DOWN = death.
+  */
+static void Demo_Anim(void)
+{
+  uint32_t start = HAL_GetTick();
+  uint8_t prev_joy = 0;
+
+  ILI9341_FillScreen(ILI9341_COLOR_BLACK);
+  ILI9341_DrawString(10, 10, "ANIM TEST", ILI9341_COLOR_WHITE, ILI9341_COLOR_BLACK, 2);
+  ILI9341_DrawString(10, 40, "C=FEED R=PLAY L=SLEEP", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
+  ILI9341_DrawString(10, 55, "U=RUNAWAY D=DEATH", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
+
+  Anim_Init(40, 90, PET_SPRITES_WIDTH, PET_SPRITES_HEIGHT, 5);   /* 32x32 drawn as 128x128, centered */  PetAnims_RegisterAll();
+  Anim_Play(ANIM_IDLE);
+
+  while ((HAL_GetTick() - start) < 20000U)
+  {
+    uint8_t joy = Joystick_Read();
+    uint8_t pressed = (uint8_t)(joy & (uint8_t)~prev_joy);  /* new presses only */
+    prev_joy = joy;
+
+    if      (pressed & JOY_CENTER_MASK) { Anim_Play(ANIM_FEED); }
+    else if (pressed & JOY_RIGHT_MASK)  { Anim_Play(ANIM_PLAY); }
+    else if (pressed & JOY_LEFT_MASK)   { Anim_Play(ANIM_ACTION3); }
+    else if (pressed & JOY_UP_MASK)     { Anim_Play(ANIM_RUNAWAY); }
+    else if (pressed & JOY_DOWN_MASK)   { Anim_Play(ANIM_DEATH); }
+
+    /* Feed and play return to idle; death and runaway stay on their last frame */
+    if (Anim_IsFinished() &&
+        ((Anim_Current() == ANIM_FEED) || (Anim_Current() == ANIM_PLAY)))
+    {
+      Anim_Play(ANIM_IDLE);
+    }
+
+    Anim_Update(HAL_GetTick());
+  }
+}
+
+
 
 /**
   * @brief  Live joystick (B1) status readout for a few seconds.

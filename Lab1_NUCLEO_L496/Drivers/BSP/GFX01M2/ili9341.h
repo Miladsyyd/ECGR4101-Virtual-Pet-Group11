@@ -43,6 +43,17 @@ void ILI9341_DrawVLine(uint16_t x, uint16_t y, uint16_t h, uint16_t color);
 void ILI9341_DrawLine(int16_t x0, int16_t y0, int16_t x1, int16_t y1, uint16_t color);
 void ILI9341_DrawRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t color);
 
+   
+/* ADDED BY Milad*********************/
+/* Draws a w x h RGB565 image (row-major, top-left first) at (x, y).
+    * The image may live in Flash (const). Parts outside the screen are clipped. */
+void ILI9341_DrawBitmap(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const uint16_t *pixels);
+/* Same as DrawBitmap, but each source pixel is drawn as a scale x scale block,
+ * so a 32x32 image with scale 4 appears as 128x128. The scaled image must fit
+ * on the screen (no clipping). */
+void ILI9341_DrawBitmapScaled(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+                              uint8_t scale, const uint16_t *pixels);
+
 /* size = 1 draws the native 5x7 glyph, size = 2 draws it at double scale, etc. */
 void ILI9341_DrawChar(uint16_t x, uint16_t y, char c, uint16_t color, uint16_t bg, uint8_t size);
 void ILI9341_DrawString(uint16_t x, uint16_t y, const char *str, uint16_t color, uint16_t bg, uint8_t size);
