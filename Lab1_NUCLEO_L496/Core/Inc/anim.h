@@ -33,8 +33,8 @@ typedef struct
     bool     loop;                  /* true = repeat, false = play once */
 } Animation;
 
-/* Sets where the sprite is drawn and its size; clears all registrations. */
-void   Anim_Init(uint16_t x, uint16_t y, uint16_t w, uint16_t h);
+/* w, h = frame size in memory; scale = drawn size multiplier (1 = actual size). */
+void   Anim_Init(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t scale);
 
 /* Connects an animation (frame table + timing) to an AnimId. */
 void   Anim_Register(AnimId id, const Animation *anim);

@@ -190,6 +190,51 @@ void ILI9341_FillRect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t c
        LCD_CS_High();
    }
 
+void ILI9341_DrawBitmapScaled(uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+                              uint8_t scale, const uint16_t *pixels)
+{
+    static uint8_t row_buf[ILI9341_WIDTH * 2];   /* static: 1 KB stack */
+    uint16_t out_w, out_h, row, col, i;
+    uint8_t k;
+
+    if ((pixels == NULL) || (w == 0U) || (h == 0U) || (scale == 0U)) { return; }
+    out_w = (uint16_t)(w * scale);
+    out_h = (uint16_t)(h * scale);
+    if (((uint32_t)x + out_w > ILI9341_WIDTH) || ((uint32_t)y + out_h > ILI9341_HEIGHT))
+    {
+        return;   /* must fit completely on screen */
+    }
+
+    LCD_SetAddressWindow(x, y, x + out_w - 1, y + out_h - 1);
+
+    HAL_GPIO_WritePin(LCD_DC_GPIO_Port, LCD_DC_Pin, GPIO_PIN_SET);
+    LCD_CS_Low();
+    for (row = 0; row < h; row++)
+    {
+        const uint16_t *src = &pixels[(uint32_t)row * w];
+
+        /* Build one enlarged row: each pixel repeated 'scale' times, high byte first */
+        i = 0;
+        for (col = 0; col < w; col++)
+        {
+            uint8_t hi = (uint8_t)(src[col] >> 8);
+            uint8_t lo = (uint8_t)(src[col] & 0xFF);
+            for (k = 0; k < scale; k++)
+            {
+                row_buf[i++] = hi;
+                row_buf[i++] = lo;
+            }
+        }
+        /* Send that row 'scale' times to enlarge vertically */
+        for (k = 0; k < scale; k++)
+        {
+            HAL_SPI_Transmit(ili9341_hspi, row_buf, (uint16_t)(out_w * 2), HAL_MAX_DELAY);
+        }
+    }
+    LCD_CS_High();
+}
+
+
              /* DRAWBITMAP MILAD**************************/
 
              

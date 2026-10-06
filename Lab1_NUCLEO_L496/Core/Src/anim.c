@@ -11,17 +11,19 @@
 
 static const Animation *anims[ANIM_COUNT];
 static uint16_t pos_x, pos_y, spr_w, spr_h;
+static uint8_t  spr_scale = 1;
 static AnimId   cur = ANIM_IDLE;
 static uint8_t  idx;
 static uint32_t last_ms;
 static bool     finished = true;
 static bool     dirty;
 
-void Anim_Init(uint16_t x, uint16_t y, uint16_t w, uint16_t h)
+void Anim_Init(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t scale)
 {
     uint8_t i;
 
     pos_x = x; pos_y = y; spr_w = w; spr_h = h;
+    spr_scale = (scale == 0U) ? 1U : scale;
     for (i = 0; i < (uint8_t)ANIM_COUNT; i++)
     {
         anims[i] = NULL;
@@ -80,10 +82,10 @@ void Anim_Update(uint32_t now_ms)
         }
     }
 
-    /* Redraw only when the frame changed: about 40 ms of SPI per 64x64 frame */
+       /* Redraw only when the frame changed (about 150 ms of SPI at 128x128) */
     if (dirty)
     {
-        ILI9341_DrawBitmap(pos_x, pos_y, spr_w, spr_h, a->frames[idx]);
+        ILI9341_DrawBitmapScaled(pos_x, pos_y, spr_w, spr_h, spr_scale, a->frames[idx]);
         dirty = false;
     }
 }
