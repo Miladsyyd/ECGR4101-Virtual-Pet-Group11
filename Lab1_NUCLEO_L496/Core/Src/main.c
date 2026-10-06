@@ -230,7 +230,7 @@ static void Demo_Anim(void)
   ILI9341_DrawString(10, 40, "C=FEED R=PLAY L=SLEEP", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
   ILI9341_DrawString(10, 55, "U=RUNAWAY D=DEATH", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
 
-  Anim_Init(56, 100, PET_SPRITES_WIDTH, PET_SPRITES_HEIGHT, 4);   /* 32x32 drawn as 128x128, centered */  PetAnims_RegisterAll();
+  Anim_Init(40, 90, PET_SPRITES_WIDTH, PET_SPRITES_HEIGHT, 5);   /* 32x32 drawn as 128x128, centered */  PetAnims_RegisterAll();
   Anim_Play(ANIM_IDLE);
 
   while ((HAL_GetTick() - start) < 20000U)
