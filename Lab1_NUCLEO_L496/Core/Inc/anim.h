@@ -42,6 +42,9 @@ void   Anim_Register(AnimId id, const Animation *anim);
 /* Starts an animation from its first frame. Ignored if not registered. */
 void   Anim_Play(AnimId id);
 
+/* Pauses frame advancement without discarding the current animation. */
+void   Anim_Pause(bool paused);
+
 /* Call every main-loop pass. Advances frames when due and redraws only
  * when the frame actually changes. Never blocks. */
 void   Anim_Update(uint32_t now_ms);
