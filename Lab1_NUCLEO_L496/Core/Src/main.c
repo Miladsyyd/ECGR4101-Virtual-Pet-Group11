@@ -39,6 +39,7 @@
 #include "pet_sprites.h"
 #include "shake.h"
 #include "radio_game.h"
+#include "sound.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -48,6 +49,7 @@ SPI_HandleTypeDef hspi1;
 ADC_HandleTypeDef hadc1;
 I2C_HandleTypeDef hi2c1;
 UART_HandleTypeDef hlpuart1;
+TIM_HandleTypeDef htim1;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
@@ -57,6 +59,7 @@ void PeriphCommonClock_Config(void);
 static void MX_LPUART1_UART_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_I2C1_Init(void);
+static void MX_TIM1_Init(void);
 
 static void Demo_ColorBars(void);
 static void Demo_Shapes(void);
@@ -110,6 +113,8 @@ int main(void)
   MX_ADC1_Init();
   MX_I2C1_Init();
   MX_LPUART1_UART_Init();
+  MX_TIM1_Init();
+  Sound_Init();
 
 
   const char startup_msg[] = "\r\nUART STARTED\r\n";
@@ -181,6 +186,43 @@ RadioGame_Update(&hadc1,
 
 
   }
+}
+
+static void MX_TIM1_Init(void)
+{
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  __HAL_RCC_TIM1_CLK_ENABLE();
+
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 0;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 999;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  __HAL_RCC_GPIOE_CLK_ENABLE();
+  GPIO_InitStruct.Pin = GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 }
 
 /**

@@ -83,6 +83,7 @@ void Sound_Init(void)
 {
     // Prescaler divides the timer clock down to 1 MHz (1 count = 1 us) 
     __HAL_TIM_SET_PRESCALER(&htim1, (timer_clock_hz() / TICK_HZ) - 1U);
+    __HAL_TIM_GENERATE_EVENT(&htim1, TIM_EVENTSOURCE_UPDATE);
     __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);        // start silent 
     HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);               // enable PWM output on PE9 
 }

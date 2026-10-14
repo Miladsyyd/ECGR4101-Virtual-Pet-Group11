@@ -50,6 +50,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/Core/Src/pet_anims.c
     ${CMAKE_SOURCE_DIR}/Core/Src/shake.c
     ${CMAKE_SOURCE_DIR}/Core/Src/radio_game.c
+    ${CMAKE_SOURCE_DIR}/Core/Src/sound.c
 )
 
 # Add include paths
