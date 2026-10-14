@@ -5,7 +5,9 @@
 
 typedef enum {
     SCREEN_MAIN,
-    SCREEN_MENU
+    SCREEN_MENU,
+    SCREEN_DEAD,
+    SCREEN_RUNAWAY
 } UI_Screen;
 
 #define BTN_UP      0x01
@@ -14,6 +16,7 @@ typedef enum {
 #define BTN_CENTER  0x08
 
 #define DEBOUNCE_MS 30U
+#define MENU_COUNT  4U
 
 static UI_Screen currentScreen = SCREEN_MAIN;
 static uint8_t menuSelection = 0;
@@ -29,10 +32,11 @@ static uint8_t stableButtons = 0;
 static uint8_t inputArmed = 1;
 static uint32_t lastInputTime = 0;
 
-static const char *menuOptions[3] = {
+static const char *menuOptions[MENU_COUNT] = {
     "FEED",
     "PLAY",
-    "SLEEP"
+    "SLEEP",
+    "BACK TO IDLE"
 };
 
 
@@ -66,7 +70,7 @@ void UI_GraphicsTest(void)
 }
 
 
-// Draw status bar
+// Status bar
 
 static void UI_DrawBar(uint16_t y,
                        uint8_t value,
@@ -91,7 +95,7 @@ static void UI_DrawBar(uint16_t y,
 }
 
 
-// Main pet screen
+// Main / Idle screen
 
 void UI_DrawMainScreen(void)
 {
@@ -103,11 +107,9 @@ void UI_DrawMainScreen(void)
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 
-    // Sprout display area
     ILI9341_DrawRect(20, 35, 200, 145,
                      ILI9341_COLOR_CYAN);
 
-    // Placeholder for Member 2's artwork
     ILI9341_DrawString(102, 105, "SPROUT",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
@@ -136,7 +138,7 @@ void UI_DrawMainScreen(void)
 }
 
 
-// Feed status
+// Feed bar
 
 void UI_UpdateFeed(uint8_t feed)
 {
@@ -150,13 +152,12 @@ void UI_UpdateFeed(uint8_t feed)
 
     if (currentScreen == SCREEN_MAIN)
     {
-        UI_DrawBar(203, feedValue,
-                   ILI9341_COLOR_GREEN);
+        UI_DrawBar(203, feedValue, ILI9341_COLOR_GREEN);
     }
 }
 
 
-// Play status
+// Play bar
 
 void UI_UpdatePlay(uint8_t play)
 {
@@ -170,13 +171,12 @@ void UI_UpdatePlay(uint8_t play)
 
     if (currentScreen == SCREEN_MAIN)
     {
-        UI_DrawBar(238, playValue,
-                   ILI9341_COLOR_YELLOW);
+        UI_DrawBar(238, playValue, ILI9341_COLOR_YELLOW);
     }
 }
 
 
-// Sleep status
+// Sleep bar
 
 void UI_UpdateSleep(uint8_t sleep)
 {
@@ -190,38 +190,37 @@ void UI_UpdateSleep(uint8_t sleep)
 
     if (currentScreen == SCREEN_MAIN)
     {
-        UI_DrawBar(273, sleepValue,
-                   ILI9341_COLOR_BLUE);
+        UI_DrawBar(273, sleepValue, ILI9341_COLOR_BLUE);
     }
 }
 
 
-// Draw one menu option
+// Draw menu option
 
 static void UI_DrawMenuOption(uint8_t index,
                               uint8_t selected)
 {
-    uint16_t y = 90 + index * 55;
+    uint16_t y = 75 + index * 48;
 
-    ILI9341_FillRect(20, y, 200, 40,
+    ILI9341_FillRect(20, y, 200, 38,
                      ILI9341_COLOR_BLACK);
 
     if (selected)
     {
-        ILI9341_FillRect(20, y, 200, 40,
+        ILI9341_FillRect(20, y, 200, 38,
                          ILI9341_COLOR_CYAN);
 
-        ILI9341_DrawString(75, y + 16,
+        ILI9341_DrawString(55, y + 15,
                            menuOptions[index],
                            ILI9341_COLOR_BLACK,
                            ILI9341_COLOR_CYAN, 1);
     }
     else
     {
-        ILI9341_DrawRect(20, y, 200, 40,
+        ILI9341_DrawRect(20, y, 200, 38,
                          ILI9341_COLOR_WHITE);
 
-        ILI9341_DrawString(75, y + 16,
+        ILI9341_DrawString(55, y + 15,
                            menuOptions[index],
                            ILI9341_COLOR_WHITE,
                            ILI9341_COLOR_BLACK, 1);
@@ -233,7 +232,7 @@ static void UI_DrawMenuOption(uint8_t index,
 
 void UI_DrawMenu(uint8_t selection)
 {
-    if (selection > 2)
+    if (selection >= MENU_COUNT)
         selection = 0;
 
     currentScreen = SCREEN_MENU;
@@ -245,7 +244,7 @@ void UI_DrawMenu(uint8_t selection)
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 
-    for (uint8_t i = 0; i < 3; i++)
+    for (uint8_t i = 0; i < MENU_COUNT; i++)
     {
         UI_DrawMenuOption(i, i == menuSelection);
     }
@@ -256,18 +255,17 @@ void UI_DrawMenu(uint8_t selection)
 }
 
 
-// Change menu selection
+// Change selection
 
 static void UI_ChangeSelection(uint8_t newSelection)
 {
-    if (newSelection > 2)
+    if (newSelection >= MENU_COUNT)
         return;
 
     if (newSelection == menuSelection)
         return;
 
     uint8_t oldSelection = menuSelection;
-
     menuSelection = newSelection;
 
     UI_DrawMenuOption(oldSelection, 0);
@@ -275,11 +273,77 @@ static void UI_ChangeSelection(uint8_t newSelection)
 }
 
 
-// Return to main screen
+// Return to Idle
 
 void UI_ReturnToMain(void)
 {
     UI_DrawMainScreen();
+}
+
+
+// Death screen
+
+void UI_DrawDeathScreen(void)
+{
+    currentScreen = SCREEN_DEAD;
+
+    ILI9341_FillScreen(ILI9341_COLOR_BLACK);
+
+    ILI9341_DrawString(87, 10, "VIRTUAL PET",
+                       ILI9341_COLOR_WHITE,
+                       ILI9341_COLOR_BLACK, 1);
+
+    ILI9341_DrawRect(20, 35, 200, 145,
+                     ILI9341_COLOR_RED);
+
+    ILI9341_DrawString(75, 90, "SPROUT HAS",
+                       ILI9341_COLOR_RED,
+                       ILI9341_COLOR_BLACK, 1);
+
+    ILI9341_DrawString(108, 110, "DIED",
+                       ILI9341_COLOR_RED,
+                       ILI9341_COLOR_BLACK, 1);
+
+    ILI9341_DrawString(93, 205, "GAME OVER",
+                       ILI9341_COLOR_WHITE,
+                       ILI9341_COLOR_BLACK, 1);
+
+    ILI9341_DrawString(75, 285, "CENTER: RESTART",
+                       ILI9341_COLOR_WHITE,
+                       ILI9341_COLOR_BLACK, 1);
+}
+
+
+// Runaway screen
+
+void UI_DrawRunawayScreen(void)
+{
+    currentScreen = SCREEN_RUNAWAY;
+
+    ILI9341_FillScreen(ILI9341_COLOR_BLACK);
+
+    ILI9341_DrawString(87, 10, "VIRTUAL PET",
+                       ILI9341_COLOR_WHITE,
+                       ILI9341_COLOR_BLACK, 1);
+
+    ILI9341_DrawRect(20, 35, 200, 145,
+                     ILI9341_COLOR_YELLOW);
+
+    ILI9341_DrawString(75, 90, "SPROUT RAN",
+                       ILI9341_COLOR_YELLOW,
+                       ILI9341_COLOR_BLACK, 1);
+
+    ILI9341_DrawString(108, 110, "AWAY",
+                       ILI9341_COLOR_YELLOW,
+                       ILI9341_COLOR_BLACK, 1);
+
+    ILI9341_DrawString(93, 205, "GAME OVER",
+                       ILI9341_COLOR_WHITE,
+                       ILI9341_COLOR_BLACK, 1);
+
+    ILI9341_DrawString(75, 285, "CENTER: RESTART",
+                       ILI9341_COLOR_WHITE,
+                       ILI9341_COLOR_BLACK, 1);
 }
 
 
@@ -291,33 +355,25 @@ static uint8_t UI_ReadJoystick(void)
 
     if (HAL_GPIO_ReadPin(JOY_UP_GPIO_Port,
                          JOY_UP_Pin) == GPIO_PIN_RESET)
-    {
         buttons |= BTN_UP;
-    }
 
     if (HAL_GPIO_ReadPin(JOY_DOWN_GPIO_Port,
                          JOY_DOWN_Pin) == GPIO_PIN_RESET)
-    {
         buttons |= BTN_DOWN;
-    }
 
     if (HAL_GPIO_ReadPin(JOY_LEFT_GPIO_Port,
                          JOY_LEFT_Pin) == GPIO_PIN_RESET)
-    {
         buttons |= BTN_LEFT;
-    }
 
     if (HAL_GPIO_ReadPin(JOY_CENTER_GPIO_Port,
                          JOY_CENTER_Pin) == GPIO_PIN_RESET)
-    {
         buttons |= BTN_CENTER;
-    }
 
     return buttons;
 }
 
 
-// Process button input
+// Process input
 
 static void UI_ProcessButton(uint8_t button)
 {
@@ -332,22 +388,28 @@ static void UI_ProcessButton(uint8_t button)
     {
         if (button == BTN_UP)
         {
-            uint8_t next = (menuSelection + 2) % 3;
-            UI_ChangeSelection(next);
+            UI_ChangeSelection(
+                (menuSelection + MENU_COUNT - 1) % MENU_COUNT);
         }
         else if (button == BTN_DOWN)
         {
-            uint8_t next = (menuSelection + 1) % 3;
-            UI_ChangeSelection(next);
+            UI_ChangeSelection(
+                (menuSelection + 1) % MENU_COUNT);
         }
         else if (button == BTN_CENTER)
         {
             if (menuSelection == 0)
+            {
                 pendingAction = UI_ACTION_FEED;
+            }
             else if (menuSelection == 1)
+            {
                 pendingAction = UI_ACTION_PLAY;
-            else
+            }
+            else if (menuSelection == 2)
+            {
                 pendingAction = UI_ACTION_SLEEP;
+            }
 
             UI_ReturnToMain();
         }
@@ -356,10 +418,18 @@ static void UI_ProcessButton(uint8_t button)
             UI_ReturnToMain();
         }
     }
+    else if (currentScreen == SCREEN_DEAD ||
+             currentScreen == SCREEN_RUNAWAY)
+    {
+        if (button == BTN_CENTER)
+        {
+            pendingAction = UI_ACTION_RESTART;
+        }
+    }
 }
 
 
-// Handle joystick input
+// Handle joystick
 
 void UI_HandleInput(void)
 {
@@ -374,9 +444,7 @@ void UI_HandleInput(void)
 
     if ((uint32_t)(currentTime - lastInputTime)
             < DEBOUNCE_MS)
-    {
         return;
-    }
 
     if (rawButtons == stableButtons)
         return;
@@ -397,7 +465,7 @@ void UI_HandleInput(void)
 }
 
 
-// Retrieve selected action
+// Get selected action
 
 UI_Action UI_GetAction(void)
 {
@@ -408,7 +476,7 @@ UI_Action UI_GetAction(void)
 }
 
 
-// Update interface
+// UI update
 
 void UI_Update(void)
 {
