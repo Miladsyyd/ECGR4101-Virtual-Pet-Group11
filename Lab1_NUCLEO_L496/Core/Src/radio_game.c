@@ -178,17 +178,5 @@ void RadioGame_Update(ADC_HandleTypeDef *hadc,
     }
 
 
-    /* Optional debug output */
-    snprintf(msg,
-             sizeof(msg),
-             "POT:%lu CH:%d HINT:%d COMPLETE:%d\r\n",
-             (unsigned long)game->pot_raw,
-             game->current_channel,
-             game->hint_flag,
-             game->complete_flag);
-
-    HAL_UART_Transmit(huart,
-                      (uint8_t *)msg,
-                      strlen(msg),
-                      HAL_MAX_DELAY);
+   
 }
