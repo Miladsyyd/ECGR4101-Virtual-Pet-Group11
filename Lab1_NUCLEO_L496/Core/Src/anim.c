@@ -17,6 +17,7 @@ static uint8_t  idx;
 static uint32_t last_ms;
 static bool     finished = true;
 static bool     dirty;
+static bool     paused;
 
 void Anim_Init(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t scale)
 {
@@ -28,7 +29,7 @@ void Anim_Init(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t scale)
     {
         anims[i] = NULL;
     }
-    cur = ANIM_IDLE; idx = 0; finished = true; dirty = false;
+    cur = ANIM_IDLE; idx = 0; finished = true; dirty = false; paused = false;
 }
 
 void Anim_Register(AnimId id, const Animation *anim)
@@ -53,11 +54,17 @@ void Anim_Play(AnimId id)
     last_ms = HAL_GetTick();
 }
 
+void Anim_Pause(bool shouldPause)
+{
+    paused = shouldPause;
+    last_ms = HAL_GetTick();
+}
+
 void Anim_Update(uint32_t now_ms)
 {
     const Animation *a = anims[cur];
 
-    if ((a == NULL) || (a->count == 0U))
+    if (paused || (a == NULL) || (a->count == 0U))
     {
         return;
     }
