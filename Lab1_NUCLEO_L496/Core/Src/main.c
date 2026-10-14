@@ -37,6 +37,11 @@
 #include "anim.h"
 #include "pet_anims.h"
 #include "pet_sprites.h"
+#include "shake.h"
+#include "radio_game.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
@@ -106,6 +111,20 @@ int main(void)
   MX_I2C1_Init();
   MX_LPUART1_UART_Init();
 
+
+  const char startup_msg[] = "\r\nUART STARTED\r\n";
+
+HAL_UART_Transmit(&hlpuart1,
+                  (uint8_t *)startup_msg,
+                  sizeof(startup_msg) - 1,
+                  HAL_MAX_DELAY);
+
+  SHAKE_Data shake = {0};
+  RadioGame_Data radio = {0};
+
+  SHAKE_Init(&hi2c1);
+  RadioGame_Init(&radio);
+
   /* Initialize the LCD and show a splash screen */
   ILI9341_Init(&hspi1);
   ILI9341_DrawString(18, 12, "GFX01M2 LCD DEMO", ILI9341_COLOR_WHITE, ILI9341_COLOR_BLACK, 2);
@@ -115,6 +134,30 @@ int main(void)
   /* Infinite loop: cycle through the demo pages */
   while (1)
   {
+    /*DAVID*/
+SHAKE_Update(&hi2c1, &shake);
+char shake_msg[160];
+
+snprintf(shake_msg,
+         sizeof(shake_msg),
+         "AX:%ld AY:%ld AZ:%ld | "
+         "dX:%ld dY:%ld dZ:%ld | SHAKE:%d\r\n",
+         (long)shake.x_mg,
+         (long)shake.y_mg,
+         (long)shake.z_mg,
+         (long)shake.delta_x,
+         (long)shake.delta_y,
+         (long)shake.delta_z,
+         shake.shake_flag);
+
+HAL_UART_Transmit(&hlpuart1,
+                  (uint8_t *)shake_msg,
+                  strlen(shake_msg),
+                  HAL_MAX_DELAY);
+/*DAVID*/
+RadioGame_Update(&hadc1,
+                 &hlpuart1,
+                 &radio);
     Demo_ColorBars();
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
     HAL_Delay(1500);
@@ -135,6 +178,8 @@ int main(void)
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
     Demo_Joystick();
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+
+
   }
 }
 
