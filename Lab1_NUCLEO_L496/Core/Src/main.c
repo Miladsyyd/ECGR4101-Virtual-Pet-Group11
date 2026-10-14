@@ -37,6 +37,7 @@
 #include "anim.h"
 #include "pet_anims.h"
 #include "pet_sprites.h"
+#include "pet_logic.h"
 #include "shake.h"
 #include "radio_game.h"
 #include "sound.h"
@@ -124,8 +125,8 @@ HAL_UART_Transmit(&hlpuart1,
                   sizeof(startup_msg) - 1,
                   HAL_MAX_DELAY);
 
-  SHAKE_Data shake = {0};
-  RadioGame_Data radio = {0};
+//  SHAKE_Data shake = {0};
+//  RadioGame_Data radio = {0};
 
   SHAKE_Init(&hi2c1);
   RadioGame_Init(&radio);
@@ -137,40 +138,39 @@ HAL_UART_Transmit(&hlpuart1,
   HAL_Delay(2000);
 
   /* Infinite loop: cycle through the demo pages */
+/*Sorayda*/
+  Anim_Init(112, 60, PET_SPRITES_WIDTH, PET_SPRITES_HEIGHT, 3);
+  PetAnims_RegisterAll();
+  Pet_Init();
+ 
+  SHAKE_Data shake = {0};
+  RadioGame_Data radio = {0};
 
-pet_Init(); // Initialize the pet
-
+ PetState lastPetState = IDLE;
+ 
   while (1)
   {
-    decay(); // Call the decay function to update hunger and happiness over time
-    int buttonPressed = //Joystick_Read(); // Read the joystick state
+    Anim_Update(HAL_GetTick());
+    Sound_Update();
+    Pet_Update(Joystick_Read());
 
-    switch (pet_state) {
-        case IDLE:
-            pet_idle();
-            checkConditions(); // Check if hunger or happiness has reached 0 -> death or run away state
-            menu(buttonPressed); //menu opens if user presses menu button
-            break;
+    PetState currentPetState = getPetState();
+    if (currentPetState != lastPetState)
+    {
+      if (currentPetState == SHAKE_GAME)
+      {
+        memset(&shake, 0, sizeof(shake));
+        if (SHAKE_Init(&hi2c1) != HAL_OK)
+        {
+          Error_Handler();
+        }
+      }
+      else if (currentPetState == RADIO_GAME)
+      {
+        RadioGame_Init(&radio);
+      }
 
-        case FEED:
-            pet_feed();
-            checkConditions(); 
-            pet_state = IDLE; // Return to IDLE after feeding
-            break;
-
-        case PLAY:
-            pet_play();
-            checkConditions();
-            pet_state = IDLE; // Return to IDLE after playing
-            break;
-
-        case SLEEP:
-            pet_sleep();
-            checkConditions();
-            pet_state = IDLE; // Return to IDLE after sleeping
-            break;
-        default:
-            break;
+      lastPetState = currentPetState;
     }
   }
    
