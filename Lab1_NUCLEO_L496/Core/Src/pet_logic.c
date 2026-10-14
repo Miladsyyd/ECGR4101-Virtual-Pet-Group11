@@ -15,6 +15,41 @@ static void decay(void);
 static void CheckValues(void);
 static void CapValues(void);
 
+pet_Init(); // Initialize the pet
+
+while (1)
+  {
+    decay(); // Call the decay function to update hunger and happiness over time
+    int buttonPressed = //Joystick_Read(); // Read the joystick state
+
+    switch (pet_state) {
+        case IDLE:
+            pet_idle();
+            checkConditions(); // Check if hunger or happiness has reached 0 -> death or run away state
+            menu(buttonPressed); //menu opens if user presses menu button
+            break;
+
+        case FEED:
+            pet_feed();
+            checkConditions(); 
+            pet_state = IDLE; // Return to IDLE after feeding
+            break;
+
+        case PLAY:
+            pet_play();
+            checkConditions();
+            pet_state = IDLE; // Return to IDLE after playing
+            break;
+
+        case SLEEP:
+            pet_sleep();
+            checkConditions();
+            pet_state = IDLE; // Return to IDLE after sleeping
+            break;
+        default:
+            break;
+    }
+  }
 
 void Pet_Init(void) { //called at the start or when restarting the pet
     pet_state = IDLE;
