@@ -3,29 +3,27 @@
 #include "ili9341.h"
 #include "gfx01m2_conf.h"
 
+#define BTN_UP       0x01
+#define BTN_DOWN     0x02
+#define BTN_LEFT     0x04
+#define BTN_CENTER   0x08
+
+#define DEBOUNCE_MS  30U
+#define MENU_COUNT   4U
+
 typedef enum {
+    SCREEN_NONE,
     SCREEN_MAIN,
     SCREEN_MENU,
     SCREEN_DEAD,
     SCREEN_RUNAWAY
 } UI_Screen;
 
-#define BTN_UP      0x01
-#define BTN_DOWN    0x02
-#define BTN_LEFT    0x04
-#define BTN_CENTER  0x08
-
-#define DEBOUNCE_MS 30U
-#define MENU_COUNT  4U
-
-static UI_Screen currentScreen = SCREEN_MAIN;
+static UI_Screen currentScreen = SCREEN_NONE;
 static uint8_t menuSelection = 0;
 
-static UI_Action pendingAction = UI_ACTION_NONE;
-
-static uint8_t feedValue = 100;
-static uint8_t playValue = 100;
-static uint8_t sleepValue = 100;
+static int displayedHunger = -1;
+static int displayedHappiness = -1;
 
 static uint8_t lastRawButtons = 0;
 static uint8_t stableButtons = 0;
@@ -72,12 +70,23 @@ void UI_GraphicsTest(void)
 
 // Status bar
 
+static uint8_t UI_LimitValue(int value)
+{
+    if (value < 0)
+        return 0;
+
+    if (value > 100)
+        return 100;
+
+    return (uint8_t)value;
+}
+
+
 static void UI_DrawBar(uint16_t y,
-                       uint8_t value,
+                       int value,
                        uint16_t color)
 {
-    if (value > 100)
-        value = 100;
+    uint8_t level = UI_LimitValue(value);
 
     ILI9341_FillRect(20, y, 200, 10,
                      ILI9341_COLOR_BLACK);
@@ -85,7 +94,7 @@ static void UI_DrawBar(uint16_t y,
     ILI9341_DrawRect(20, y, 200, 10,
                      ILI9341_COLOR_WHITE);
 
-    uint16_t width = (uint16_t)value * 196 / 100;
+    uint16_t width = (uint16_t)level * 196 / 100;
 
     if (width > 0)
     {
@@ -95,11 +104,14 @@ static void UI_DrawBar(uint16_t y,
 }
 
 
-// Main / Idle screen
+// Main screen
 
 void UI_DrawMainScreen(void)
 {
     currentScreen = SCREEN_MAIN;
+
+    displayedHunger = -1;
+    displayedHappiness = -1;
 
     ILI9341_FillScreen(ILI9341_COLOR_BLACK);
 
@@ -118,84 +130,67 @@ void UI_DrawMainScreen(void)
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 
-    UI_DrawBar(203, feedValue, ILI9341_COLOR_GREEN);
-
     ILI9341_DrawString(20, 225, "PLAY",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
-
-    UI_DrawBar(238, playValue, ILI9341_COLOR_YELLOW);
 
     ILI9341_DrawString(20, 260, "SLEEP",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 
-    UI_DrawBar(273, sleepValue, ILI9341_COLOR_BLUE);
+    ILI9341_DrawRect(20, 273, 200, 10,
+                     ILI9341_COLOR_WHITE);
+
+    ILI9341_DrawString(105, 274, "N/A",
+                       ILI9341_COLOR_GRAY,
+                       ILI9341_COLOR_BLACK, 1);
 
     ILI9341_DrawString(20, 300, "CENTER: MENU",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
+
+    UI_UpdateHunger();
+    UI_UpdateHappiness();
 }
 
 
-// Feed bar
+// Hunger status
 
-void UI_UpdateFeed(uint8_t feed)
+void UI_UpdateHunger(void)
 {
-    if (feed > 100)
-        feed = 100;
-
-    if (feed == feedValue)
+    if (currentScreen != SCREEN_MAIN)
         return;
 
-    feedValue = feed;
+    int hunger = getHunger();
 
-    if (currentScreen == SCREEN_MAIN)
-    {
-        UI_DrawBar(203, feedValue, ILI9341_COLOR_GREEN);
-    }
-}
-
-
-// Play bar
-
-void UI_UpdatePlay(uint8_t play)
-{
-    if (play > 100)
-        play = 100;
-
-    if (play == playValue)
+    if (hunger == displayedHunger)
         return;
 
-    playValue = play;
+    displayedHunger = hunger;
 
-    if (currentScreen == SCREEN_MAIN)
-    {
-        UI_DrawBar(238, playValue, ILI9341_COLOR_YELLOW);
-    }
+    UI_DrawBar(203, hunger, ILI9341_COLOR_GREEN);
 }
 
 
-// Sleep bar
+// Happiness status
 
-void UI_UpdateSleep(uint8_t sleep)
+void UI_UpdateHappiness(void)
 {
-    if (sleep > 100)
-        sleep = 100;
-
-    if (sleep == sleepValue)
+    if (currentScreen != SCREEN_MAIN)
         return;
 
-    sleepValue = sleep;
+    int happiness = getHappiness();
 
-    if (currentScreen == SCREEN_MAIN)
-    {
-        UI_DrawBar(273, sleepValue, ILI9341_COLOR_BLUE);
-    }
+    if (happiness == displayedHappiness)
+        return;
+
+    displayedHappiness = happiness;
+
+    UI_DrawBar(238, happiness, ILI9341_COLOR_YELLOW);
 }
 
 
-// Draw menu option
+// Menu option
 
 static void UI_DrawMenuOption(uint8_t index,
                               uint8_t selected)
@@ -255,7 +250,7 @@ void UI_DrawMenu(uint8_t selection)
 }
 
 
-// Change selection
+// Menu selection
 
 static void UI_ChangeSelection(uint8_t newSelection)
 {
@@ -277,7 +272,12 @@ static void UI_ChangeSelection(uint8_t newSelection)
 
 void UI_ReturnToMain(void)
 {
-    UI_DrawMainScreen();
+    setPetState(IDLE);
+
+    if (getPetState() == IDLE)
+    {
+        UI_DrawMainScreen();
+    }
 }
 
 
@@ -296,7 +296,7 @@ void UI_DrawDeathScreen(void)
     ILI9341_DrawRect(20, 35, 200, 145,
                      ILI9341_COLOR_RED);
 
-    ILI9341_DrawString(75, 90, "SPROUT HAS",
+    ILI9341_DrawString(90, 90, "SPROUT HAS",
                        ILI9341_COLOR_RED,
                        ILI9341_COLOR_BLACK, 1);
 
@@ -329,7 +329,7 @@ void UI_DrawRunawayScreen(void)
     ILI9341_DrawRect(20, 35, 200, 145,
                      ILI9341_COLOR_YELLOW);
 
-    ILI9341_DrawString(75, 90, "SPROUT RAN",
+    ILI9341_DrawString(90, 90, "SPROUT RAN",
                        ILI9341_COLOR_YELLOW,
                        ILI9341_COLOR_BLACK, 1);
 
@@ -377,14 +377,17 @@ static uint8_t UI_ReadJoystick(void)
 
 static void UI_ProcessButton(uint8_t button)
 {
-    if (currentScreen == SCREEN_MAIN)
+    PetState state = getPetState();
+
+    if (state == IDLE)
     {
         if (button == BTN_CENTER)
         {
+            setPetState(MENU);
             UI_DrawMenu(0);
         }
     }
-    else if (currentScreen == SCREEN_MENU)
+    else if (state == MENU)
     {
         if (button == BTN_UP)
         {
@@ -396,40 +399,49 @@ static void UI_ProcessButton(uint8_t button)
             UI_ChangeSelection(
                 (menuSelection + 1) % MENU_COUNT);
         }
-        else if (button == BTN_CENTER)
-        {
-            if (menuSelection == 0)
-            {
-                pendingAction = UI_ACTION_FEED;
-            }
-            else if (menuSelection == 1)
-            {
-                pendingAction = UI_ACTION_PLAY;
-            }
-            else if (menuSelection == 2)
-            {
-                pendingAction = UI_ACTION_SLEEP;
-            }
-
-            UI_ReturnToMain();
-        }
         else if (button == BTN_LEFT)
         {
             UI_ReturnToMain();
         }
+        else if (button == BTN_CENTER)
+        {
+            if (menuSelection == 0)
+            {
+                updatePetState(FEED);
+            }
+            else if (menuSelection == 1)
+            {
+                updatePetState(PLAY);
+            }
+            else if (menuSelection == 2)
+            {
+                updatePetState(SLEEP);
+            }
+            else
+            {
+                UI_ReturnToMain();
+                return;
+            }
+
+            if (getPetState() != DEAD &&
+                getPetState() != RUN_AWAY)
+            {
+                UI_ReturnToMain();
+            }
+        }
     }
-    else if (currentScreen == SCREEN_DEAD ||
-             currentScreen == SCREEN_RUNAWAY)
+    else if (state == DEAD || state == RUN_AWAY)
     {
         if (button == BTN_CENTER)
         {
-            pendingAction = UI_ACTION_RESTART;
+            Pet_Init();
+            UI_DrawMainScreen();
         }
     }
 }
 
 
-// Handle joystick
+// Joystick debounce
 
 void UI_HandleInput(void)
 {
@@ -443,7 +455,7 @@ void UI_HandleInput(void)
     }
 
     if ((uint32_t)(currentTime - lastInputTime)
-            < DEBOUNCE_MS)
+        < DEBOUNCE_MS)
         return;
 
     if (rawButtons == stableButtons)
@@ -465,20 +477,37 @@ void UI_HandleInput(void)
 }
 
 
-// Get selected action
-
-UI_Action UI_GetAction(void)
-{
-    UI_Action action = pendingAction;
-    pendingAction = UI_ACTION_NONE;
-
-    return action;
-}
-
-
 // UI update
 
 void UI_Update(void)
 {
+    updatePetState(getPetState());
+
+    PetState state = getPetState();
+
+    if (state == DEAD)
+    {
+        if (currentScreen != SCREEN_DEAD)
+            UI_DrawDeathScreen();
+    }
+    else if (state == RUN_AWAY)
+    {
+        if (currentScreen != SCREEN_RUNAWAY)
+            UI_DrawRunawayScreen();
+    }
+    else if (state == MENU)
+    {
+        if (currentScreen != SCREEN_MENU)
+            UI_DrawMenu(menuSelection);
+    }
+    else if (state == IDLE)
+    {
+        if (currentScreen != SCREEN_MAIN)
+            UI_DrawMainScreen();
+
+        UI_UpdateHunger();
+        UI_UpdateHappiness();
+    }
+
     UI_HandleInput();
 }
