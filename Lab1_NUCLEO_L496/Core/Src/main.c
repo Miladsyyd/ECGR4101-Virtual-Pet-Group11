@@ -137,8 +137,43 @@ HAL_UART_Transmit(&hlpuart1,
   HAL_Delay(2000);
 
   /* Infinite loop: cycle through the demo pages */
+
+pet_Init(); // Initialize the pet
+
   while (1)
   {
+    decay(); // Call the decay function to update hunger and happiness over time
+    int buttonPressed = //Joystick_Read(); // Read the joystick state
+
+    switch (pet_state) {
+        case IDLE:
+            pet_idle();
+            checkConditions(); // Check if hunger or happiness has reached 0 -> death or run away state
+            menu(buttonPressed); //menu opens if user presses menu button
+            break;
+
+        case FEED:
+            pet_feed();
+            checkConditions(); 
+            pet_state = IDLE; // Return to IDLE after feeding
+            break;
+
+        case PLAY:
+            pet_play();
+            checkConditions();
+            pet_state = IDLE; // Return to IDLE after playing
+            break;
+
+        case SLEEP:
+            pet_sleep();
+            checkConditions();
+            pet_state = IDLE; // Return to IDLE after sleeping
+            break;
+        default:
+            break;
+    }
+  }
+   
     /*DAVID*/
 SHAKE_Update(&hi2c1, &shake);
 char shake_msg[160];

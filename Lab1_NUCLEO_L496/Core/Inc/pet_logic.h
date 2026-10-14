@@ -1,35 +1,44 @@
 #ifndef PET_LOGIC_H
 #define PET_LOGIC_H
 
-typedef enum{
-  IDLE,
-  MENU,
-  FEED,
-  PLAY,
-  SLEEP,
-  DEAD,
-  RUN_AWAY
+#include <stdint.h>
+
+// Pet states
+typedef enum {
+    IDLE,
+    MENU,
+    FEED,
+    PLAY,
+    SLEEP,
+    DEAD,
+    RUN_AWAY
 } PetState;
 
-//Starts or restarts the pet, setting hunger and happiness to 100 and state to IDLE
-void Pet_Init(void); 
+// Current pet state
+extern PetState pet_state;
 
-//Runs the pet logic repeatedly in main loop, includes decay
-void updatePetState(PetState newState);
+// Pet initialization
+void Pet_Init(void);
 
-void pet_idle(void); //placeholder for idle state logic, can be used to display the pet's idle behavior
-void pet_menu(void); // placeholder for menu state logic, can be used to display the menu options and handle user input for selecting actions
-void pet_dead(void); //placeholder for dead state logic, can be used to display a message or handle user input for restarting the pet
-void pet_run_away(void); //placeholder for run away state logic, can be used to display a message or handle user input for restarting the pet
+// Pet actions
+void pet_idle(void);
+void pet_feed(void);
+void pet_play(void);
+void pet_sleep(void);
 
-void pet_feed(void); //Increases hunger by 20
-void pet_play(void); //Increases happiness by 20
-void pet_sleep(void); //Decreases hunger by 25 and increases happiness by 10
+// Menu
+void menu(int buttonPressed);
 
-void setPetState(PetState newState); 
+// Death and runaway
+void death(void);
+void gone(void);
 
+// State management
+void setPetState(PetState newState);
 PetState getPetState(void);
+
+// Pet stats
 int getHappiness(void);
 int getHunger(void);
 
-#endif
+#endif // PET_LOGIC_H

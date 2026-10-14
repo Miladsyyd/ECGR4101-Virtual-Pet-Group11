@@ -1,4 +1,8 @@
 #include "pet_logic.h"
+#include "anim.h"
+#include "pet_anim.h"
+#include "pet_anims.h"
+#include "pet_sprites.h"
 #include "main.h"
 #include <stdint.h>
 #define DECAY_INTERVAL 10000U // 10 seconds in milliseconds
@@ -11,6 +15,42 @@ static void decay(void);
 static void CheckValues(void);
 static void CapValues(void);
 
+pet_Init(); // Initialize the pet
+
+while (1)
+  {
+    decay(); // Call the decay function to update hunger and happiness over time
+    int buttonPressed = //Joystick_Read(); // Read the joystick state
+
+    switch (pet_state) {
+        case IDLE:
+            pet_idle();
+            checkConditions(); // Check if hunger or happiness has reached 0 -> death or run away state
+            menu(buttonPressed); //menu opens if user presses menu button
+            break;
+
+        case FEED:
+            pet_feed();
+            checkConditions(); 
+            pet_state = IDLE; // Return to IDLE after feeding
+            break;
+
+        case PLAY:
+            pet_play();
+            checkConditions();
+            pet_state = IDLE; // Return to IDLE after playing
+            break;
+
+        case SLEEP:
+            pet_sleep();
+            checkConditions();
+            pet_state = IDLE; // Return to IDLE after sleeping
+            break;
+        default:
+            break;
+    }
+  }
+
 void Pet_Init(void) { //called at the start or when restarting the pet
     pet_state = IDLE;
     happiness = 100;
@@ -19,76 +59,97 @@ void Pet_Init(void) { //called at the start or when restarting the pet
     lastDecayTime = HAL_GetTick(); // Initialize the last decay time
 }
 
-void updatePetState(PetState newState) {
-    decay(); // Call the decay function to update hunger and happiness over time
-
-    if (newState != pet_state) {
-        
-        if (pet_state == DEAD || pet_state == RUN_AWAY){
-            return;// If the pet is dead or has run away, it cannot change state
-        }
-
-        pet_state = newState; // Update the pet state to the new state
-
-        switch (pet_state) {
-            case FEED:
-                pet_feed();
-                break;
-
-            case PLAY:
-                pet_play();
-                break;
-
-            case SLEEP:
-                pet_sleep();
-                break;
-
-            default:
-                break;
-        }
-    }
-}
-
 void pet_idle(void) {
-    //idle animation
+    Anim_Play(ANIM_IDLE);
+    return;
 }
 
-void pet_menu(void) {
-    // Logic for menu state, to be implemented
-    /*
-    can be used to display the menu options and handle user input for selecting actions
-    can go to FEED, PLAY or SLEEP
-    */
-}
-
-void pet_dead(void) {
-    // Pet remains dead until the game is restarted
-}
-
-void pet_run_away(void) {
-    //Pet remains gone until the game is restarted
+void menu(int buttonPressed) {
+    if(buttonPressed == 1) {//right
+        pet_state = FEED;
+    } else if(buttonPressed == 2) {//left
+        pet_state = PLAY;
+    } else if(buttonPressed == 3) {//up
+        pet_state = SLEEP;
+    }else if(buttonPressed == 4) {//down
+        pet_state = IDLE;
+    }
+    return;
 }
 
 void pet_feed(void){
     hunger += 20;
     CapValues(); // Ensure hunger does not exceed 100
-
+    checkConditions(); // Check if hunger or happiness has reached 0
 }
 
 void pet_play(void){
     happiness += 20;
     CapValues(); // Ensure happiness does not exceed 100
-
+    checkConditions(); // Check if hunger or happiness has reached 0
 }
 
 void pet_sleep(void){
     hunger -= 25;
     happiness += 10;
-
-    CheckValues(); // Check if hunger or happiness has reached 0
     CapValues(); // Ensure hunger and happiness do not exceed 100
-
+    checkConditions(); // Check if hunger or happiness has reached 0
 }
+
+void death(void) {
+    animSound(); // Play death + animation
+
+    if(anim_finshed){
+        display(); // Display the death screen or message and ask user to restart the game pressing any button?
+        if (buttonPressed()) {
+            Pet_Init(); // Reset the pet state and values
+        }
+    }
+}
+
+void gone(void) {
+    animSound(); // Play run away + animation
+
+    if(anim_finshed){
+        display(); // Display the run away screen or message and ask user to restart the game pressing any button?
+        if (buttonPressed()) {
+            Pet_Init(); // Reset the pet state and values
+        }
+    }
+}
+
+static void animSound(void) {
+    switch (pet_state) {
+        case DEATH:
+            Anim_Play(ANIM_DEATH);
+            //call sound effect function for death here
+
+            break;
+        case RUN_AWAY:
+            Anim_Play(ANIM_RUNAWAY);
+
+            break;
+        case FEED:
+            Anim_Play(ANIM_FEED);
+
+            break;
+        case PLAY:
+            Anim_Play(ANIM_PLAY);
+
+            break;
+        case SLEEP:
+            Anim_Play(ANIM_ACTION3);
+
+            break;
+        case IDLE:
+            Anim_Play(ANIM_IDLE);
+
+            break;
+        default:
+            break;
+    }
+}
+
 
 static void decay(void) {
     uint32_t currentTime = HAL_GetTick();
@@ -98,18 +159,22 @@ static void decay(void) {
         happiness -= 3; // Decrease happiness by 3
 
         CapValues(); // Ensure hunger and happiness do not exceed 100
-        CheckValues(); // Check if hunger or happiness has reached 0
+       // checkConditions(); // Check if hunger or happiness has reached 0
 
         lastDecayTime = currentTime; // Update the last decay time
     }
 }
 
 
-static void CheckValues(void) {
+static void checkConditions(void) {
     if (hunger <= 0) {
-        pet_state = DEAD; // Pet dies if hunger reaches 0
+        pet_state = DEAD; // Set pet state to DEAD
+        death(); // Call the death function to handle pet death
     } else if (happiness <= 0) {
-        pet_state = RUN_AWAY; // Pet runs away if happiness reaches 0
+        pet_state = RUN_AWAY; // Set pet state to RUN_AWAY
+        gone(); 
+    }else{
+        return;
     }
 }
 
