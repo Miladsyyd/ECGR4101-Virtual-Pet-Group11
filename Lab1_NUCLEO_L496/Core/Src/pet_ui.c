@@ -44,7 +44,7 @@ void UI_GraphicsTest(void)
 
     ILI9341_DrawString(20, 20, "GRAPHICS TEST",
                        ILI9341_COLOR_WHITE,
-                       ILI9341_COLOR_BLACK, 2);
+                       ILI9341_COLOR_BLACK, 1);
 
     ILI9341_FillRect(20, 70, 50, 40,
                      ILI9341_COLOR_RED);
@@ -75,10 +75,10 @@ static void UI_DrawBar(uint16_t y,
     if (value > 100)
         value = 100;
 
-    ILI9341_FillRect(20, y, 200, 12,
+    ILI9341_FillRect(20, y, 200, 10,
                      ILI9341_COLOR_BLACK);
 
-    ILI9341_DrawRect(20, y, 200, 12,
+    ILI9341_DrawRect(20, y, 200, 10,
                      ILI9341_COLOR_WHITE);
 
     uint16_t width = (uint16_t)value * 196 / 100;
@@ -86,7 +86,7 @@ static void UI_DrawBar(uint16_t y,
     if (width > 0)
     {
         ILI9341_FillRect(22, y + 2,
-                         width, 8, color);
+                         width, 6, color);
     }
 }
 
@@ -99,34 +99,36 @@ void UI_DrawMainScreen(void)
 
     ILI9341_FillScreen(ILI9341_COLOR_BLACK);
 
-    ILI9341_DrawString(45, 10, "VIRTUAL PET",
+    ILI9341_DrawString(87, 10, "VIRTUAL PET",
                        ILI9341_COLOR_WHITE,
-                       ILI9341_COLOR_BLACK, 2);
+                       ILI9341_COLOR_BLACK, 1);
 
-    ILI9341_DrawRect(20, 45, 200, 120,
+    // Sprout display area
+    ILI9341_DrawRect(20, 35, 200, 145,
                      ILI9341_COLOR_CYAN);
 
-    ILI9341_DrawString(75, 95, "PET",
-                       ILI9341_COLOR_WHITE,
-                       ILI9341_COLOR_BLACK, 2);
-
-    ILI9341_DrawString(20, 180, "FEED",
+    // Placeholder for Member 2's artwork
+    ILI9341_DrawString(102, 105, "SPROUT",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 
-    UI_DrawBar(193, feedValue, ILI9341_COLOR_GREEN);
-
-    ILI9341_DrawString(20, 218, "PLAY",
+    ILI9341_DrawString(20, 190, "FEED",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 
-    UI_DrawBar(231, playValue, ILI9341_COLOR_YELLOW);
+    UI_DrawBar(203, feedValue, ILI9341_COLOR_GREEN);
 
-    ILI9341_DrawString(20, 256, "SLEEP",
+    ILI9341_DrawString(20, 225, "PLAY",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 
-    UI_DrawBar(269, sleepValue, ILI9341_COLOR_BLUE);
+    UI_DrawBar(238, playValue, ILI9341_COLOR_YELLOW);
+
+    ILI9341_DrawString(20, 260, "SLEEP",
+                       ILI9341_COLOR_WHITE,
+                       ILI9341_COLOR_BLACK, 1);
+
+    UI_DrawBar(273, sleepValue, ILI9341_COLOR_BLUE);
 
     ILI9341_DrawString(20, 300, "CENTER: MENU",
                        ILI9341_COLOR_WHITE,
@@ -148,7 +150,7 @@ void UI_UpdateFeed(uint8_t feed)
 
     if (currentScreen == SCREEN_MAIN)
     {
-        UI_DrawBar(193, feedValue,
+        UI_DrawBar(203, feedValue,
                    ILI9341_COLOR_GREEN);
     }
 }
@@ -168,7 +170,7 @@ void UI_UpdatePlay(uint8_t play)
 
     if (currentScreen == SCREEN_MAIN)
     {
-        UI_DrawBar(231, playValue,
+        UI_DrawBar(238, playValue,
                    ILI9341_COLOR_YELLOW);
     }
 }
@@ -188,7 +190,7 @@ void UI_UpdateSleep(uint8_t sleep)
 
     if (currentScreen == SCREEN_MAIN)
     {
-        UI_DrawBar(269, sleepValue,
+        UI_DrawBar(273, sleepValue,
                    ILI9341_COLOR_BLUE);
     }
 }
@@ -209,20 +211,20 @@ static void UI_DrawMenuOption(uint8_t index,
         ILI9341_FillRect(20, y, 200, 40,
                          ILI9341_COLOR_CYAN);
 
-        ILI9341_DrawString(45, y + 12,
+        ILI9341_DrawString(75, y + 16,
                            menuOptions[index],
                            ILI9341_COLOR_BLACK,
-                           ILI9341_COLOR_CYAN, 2);
+                           ILI9341_COLOR_CYAN, 1);
     }
     else
     {
         ILI9341_DrawRect(20, y, 200, 40,
                          ILI9341_COLOR_WHITE);
 
-        ILI9341_DrawString(45, y + 12,
+        ILI9341_DrawString(75, y + 16,
                            menuOptions[index],
                            ILI9341_COLOR_WHITE,
-                           ILI9341_COLOR_BLACK, 2);
+                           ILI9341_COLOR_BLACK, 1);
     }
 }
 
@@ -239,9 +241,9 @@ void UI_DrawMenu(uint8_t selection)
 
     ILI9341_FillScreen(ILI9341_COLOR_BLACK);
 
-    ILI9341_DrawString(55, 25, "PET MENU",
+    ILI9341_DrawString(96, 25, "PET MENU",
                        ILI9341_COLOR_WHITE,
-                       ILI9341_COLOR_BLACK, 2);
+                       ILI9341_COLOR_BLACK, 1);
 
     for (uint8_t i = 0; i < 3; i++)
     {
