@@ -3,42 +3,41 @@
 
 #include <stdint.h>
 
-// Pet states
-typedef enum {
+typedef enum
+{
     IDLE,
     MENU,
     FEED,
     PLAY,
     SLEEP,
     DEAD,
-    RUN_AWAY
+    RUN_AWAY,
+    PLAY_GAME_SELECT,
+    SHAKE_GAME,
+    RADIO_GAME
 } PetState;
 
-// Current pet state
-extern PetState pet_state;
+enum
+{
+    PET_BUTTON_LEFT = 1U << 0,
+    PET_BUTTON_CENTER = 1U << 1,
+    PET_BUTTON_DOWN = 1U << 2,
+    PET_BUTTON_RIGHT = 1U << 3,
+    PET_BUTTON_UP = 1U << 4
+};
 
-// Pet initialization
 void Pet_Init(void);
+void Pet_Update(uint8_t buttons);
+void Pet_GameComplete(void);
 
-// Pet actions
-void pet_idle(void);
 void pet_feed(void);
 void pet_play(void);
 void pet_sleep(void);
 
-// Menu
-void menu(int buttonPressed);
-
-// Death and runaway
-void death(void);
-void gone(void);
-
-// State management
 void setPetState(PetState newState);
 PetState getPetState(void);
-
-// Pet stats
 int getHappiness(void);
 int getHunger(void);
+int getSleep(void);
 
-#endif // PET_LOGIC_H
+#endif
