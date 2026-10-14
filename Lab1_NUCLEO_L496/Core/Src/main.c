@@ -75,11 +75,11 @@ static void Demo_Joystick(void);
 /*EDITED by Milad*******************************/
 
 /* Joystick (B1) bit flags returned by Joystick_Read() */
-#define JOY_LEFT_MASK   (1U << 0)
-#define JOY_CENTER_MASK (1U << 1)
-#define JOY_DOWN_MASK   (1U << 2)
-#define JOY_RIGHT_MASK  (1U << 3)
-#define JOY_UP_MASK     (1U << 4)
+#define JOY_LEFT_MASK   PET_BUTTON_LEFT
+#define JOY_CENTER_MASK PET_BUTTON_CENTER
+#define JOY_DOWN_MASK   PET_BUTTON_DOWN
+#define JOY_RIGHT_MASK  PET_BUTTON_RIGHT
+#define JOY_UP_MASK     PET_BUTTON_UP
 
 static uint8_t Joystick_Read(void)
 {
@@ -125,11 +125,6 @@ HAL_UART_Transmit(&hlpuart1,
                   sizeof(startup_msg) - 1,
                   HAL_MAX_DELAY);
 
-//  SHAKE_Data shake = {0};
-//  RadioGame_Data radio = {0};
-
-  SHAKE_Init(&hi2c1);
-  RadioGame_Init(&radio);
 
   /* Initialize the LCD and show a splash screen */
   ILI9341_Init(&hspi1);
@@ -137,7 +132,6 @@ HAL_UART_Transmit(&hlpuart1,
   ILI9341_DrawString(30, 40, "NUCLEO-L496ZG-P", ILI9341_COLOR_CYAN, ILI9341_COLOR_BLACK, 1);
   HAL_Delay(2000);
 
-  /* Infinite loop: cycle through the demo pages */
 /*Sorayda*/
   Anim_Init(112, 60, PET_SPRITES_WIDTH, PET_SPRITES_HEIGHT, 3);
   PetAnims_RegisterAll();
@@ -172,57 +166,31 @@ HAL_UART_Transmit(&hlpuart1,
 
       lastPetState = currentPetState;
     }
-  }
-   
-    /*DAVID*/
-SHAKE_Update(&hi2c1, &shake);
-char shake_msg[160];
 
-snprintf(shake_msg,
-         sizeof(shake_msg),
-         "AX:%ld AY:%ld AZ:%ld | "
-         "dX:%ld dY:%ld dZ:%ld | SHAKE:%d\r\n",
-         (long)shake.x_mg,
-         (long)shake.y_mg,
-         (long)shake.z_mg,
-         (long)shake.delta_x,
-         (long)shake.delta_y,
-         (long)shake.delta_z,
-         shake.shake_flag);
+   if (currentPetState == SHAKE_GAME)
+    {
+      if (SHAKE_Update(&hi2c1, &shake) != HAL_OK)
+      {
+        Error_Handler();
+      }
+      else if (shake.shake_flag != 0U)
+      {
+        Pet_GameComplete();
+      }
+    }
+    else if (currentPetState == RADIO_GAME)
+    {
+      RadioGame_Update(&hadc1, &hlpuart1, &radio);
+      if (radio.complete_flag != 0U)
+      {
+        Pet_GameComplete();
+      }
+    }
 
-HAL_UART_Transmit(&hlpuart1,
-                  (uint8_t *)shake_msg,
-                  strlen(shake_msg),
-                  HAL_MAX_DELAY);
-/*DAVID*/
-RadioGame_Update(&hadc1,
-                 &hlpuart1,
-                 &radio);
-    Demo_ColorBars();
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    HAL_Delay(1500);
-
-    Demo_Shapes();
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    HAL_Delay(1500);
-
-    Demo_Text();
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    HAL_Delay(1500);
-/*MIIIIIIIIIIIILAD*/
-    Demo_Bitmap();
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    HAL_Delay(3000);
-/*MIIIIIIIIIIIILAD*/
-    Demo_Anim();
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    Demo_Joystick();
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-
-
+    HAL_Delay(10);
   }
 }
-
+   
 static void MX_TIM1_Init(void)
 {
   TIM_OC_InitTypeDef sConfigOC = {0};
