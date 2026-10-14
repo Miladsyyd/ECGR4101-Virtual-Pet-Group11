@@ -3,13 +3,11 @@
 #include "ili9341.h"
 #include "gfx01m2_conf.h"
 
-// Screen states
 typedef enum {
     SCREEN_MAIN,
     SCREEN_MENU
 } UI_Screen;
 
-// Joystick button identifiers
 #define BTN_UP      0x01
 #define BTN_DOWN    0x02
 #define BTN_LEFT    0x04
@@ -17,46 +15,37 @@ typedef enum {
 
 #define DEBOUNCE_MS 30U
 
-// Current screen and menu selection
 static UI_Screen currentScreen = SCREEN_MAIN;
 static uint8_t menuSelection = 0;
 
-// Selected action for Member 3
 static UI_Action pendingAction = UI_ACTION_NONE;
 
-// Stored pet values
-static uint8_t previousHunger = 100;
-static uint8_t previousHappiness = 100;
+static uint8_t feedValue = 100;
+static uint8_t playValue = 100;
+static uint8_t sleepValue = 100;
 
-// Joystick debounce variables
 static uint8_t lastRawButtons = 0;
 static uint8_t stableButtons = 0;
 static uint8_t inputArmed = 1;
 static uint32_t lastInputTime = 0;
 
-// Menu options
 static const char *menuOptions[3] = {
     "FEED",
     "PLAY",
-    "ACTION 3"
+    "SLEEP"
 };
 
 
-// ---------------------------------------
-// Graphics Test
-// ---------------------------------------
+// Graphics test
 
 void UI_GraphicsTest(void)
 {
-    // Clear display
     ILI9341_FillScreen(ILI9341_COLOR_BLACK);
 
-    // Display title
     ILI9341_DrawString(20, 20, "GRAPHICS TEST",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 2);
 
-    // Colored rectangles
     ILI9341_FillRect(20, 70, 50, 40,
                      ILI9341_COLOR_RED);
 
@@ -66,11 +55,9 @@ void UI_GraphicsTest(void)
     ILI9341_FillRect(160, 70, 50, 40,
                      ILI9341_COLOR_BLUE);
 
-    // Outlined rectangle
     ILI9341_DrawRect(20, 140, 190, 60,
                      ILI9341_COLOR_YELLOW);
 
-    // Diagonal lines
     ILI9341_DrawLine(20, 230, 210, 280,
                      ILI9341_COLOR_CYAN);
 
@@ -79,152 +66,146 @@ void UI_GraphicsTest(void)
 }
 
 
-// ---------------------------------------
-// Draw Status Meter
-// ---------------------------------------
+// Draw status bar
 
-static void UI_DrawMeter(uint16_t y,
-                         uint8_t value,
-                         uint16_t color)
+static void UI_DrawBar(uint16_t y,
+                       uint8_t value,
+                       uint16_t color)
 {
     if (value > 100)
         value = 100;
 
-    // Clear only the meter region
-    ILI9341_FillRect(20, y, 200, 15,
+    ILI9341_FillRect(20, y, 200, 12,
                      ILI9341_COLOR_BLACK);
 
-    // Meter border
-    ILI9341_DrawRect(20, y, 200, 15,
+    ILI9341_DrawRect(20, y, 200, 12,
                      ILI9341_COLOR_WHITE);
 
-    // Calculate filled width
     uint16_t width = (uint16_t)value * 196 / 100;
 
-    // Draw filled portion if nonzero
     if (width > 0)
     {
         ILI9341_FillRect(22, y + 2,
-                         width, 11, color);
+                         width, 8, color);
     }
 }
 
 
-// ---------------------------------------
-// Main Pet Screen
-// ---------------------------------------
+// Main pet screen
 
 void UI_DrawMainScreen(void)
 {
     currentScreen = SCREEN_MAIN;
 
-    // Clear display
     ILI9341_FillScreen(ILI9341_COLOR_BLACK);
 
-    // Main title
-    ILI9341_DrawString(45, 15, "VIRTUAL PET",
+    ILI9341_DrawString(45, 10, "VIRTUAL PET",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 2);
 
-    // Pet display area
-    ILI9341_DrawRect(20, 55, 200, 135,
+    ILI9341_DrawRect(20, 45, 200, 120,
                      ILI9341_COLOR_CYAN);
 
-    // Placeholder for Member 2 artwork
-    ILI9341_DrawString(75, 110, "PET",
+    ILI9341_DrawString(75, 95, "PET",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 2);
 
-    // Hunger label
-    ILI9341_DrawString(20, 210, "HUNGER",
+    ILI9341_DrawString(20, 180, "FEED",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 
-    // Happiness label
-    ILI9341_DrawString(20, 255, "HAPPINESS",
+    UI_DrawBar(193, feedValue, ILI9341_COLOR_GREEN);
+
+    ILI9341_DrawString(20, 218, "PLAY",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 
-    // Draw saved status values
-    UI_DrawMeter(225, previousHunger,
-                 ILI9341_COLOR_GREEN);
+    UI_DrawBar(231, playValue, ILI9341_COLOR_YELLOW);
 
-    UI_DrawMeter(270, previousHappiness,
-                 ILI9341_COLOR_YELLOW);
+    ILI9341_DrawString(20, 256, "SLEEP",
+                       ILI9341_COLOR_WHITE,
+                       ILI9341_COLOR_BLACK, 1);
 
-    // Menu instructions
+    UI_DrawBar(269, sleepValue, ILI9341_COLOR_BLUE);
+
     ILI9341_DrawString(20, 300, "CENTER: MENU",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 }
 
 
-// ---------------------------------------
-// Update Hunger Meter
-// ---------------------------------------
+// Feed status
 
-void UI_UpdateHunger(uint8_t hunger)
+void UI_UpdateFeed(uint8_t feed)
 {
-    if (hunger > 100)
-        hunger = 100;
+    if (feed > 100)
+        feed = 100;
 
-    // Skip if value is unchanged
-    if (hunger == previousHunger)
+    if (feed == feedValue)
         return;
 
-    // Store current value
-    previousHunger = hunger;
+    feedValue = feed;
 
-    // Only draw if main screen is visible
     if (currentScreen == SCREEN_MAIN)
     {
-        UI_DrawMeter(225, hunger,
-                     ILI9341_COLOR_GREEN);
+        UI_DrawBar(193, feedValue,
+                   ILI9341_COLOR_GREEN);
     }
 }
 
 
-// ---------------------------------------
-// Update Happiness Meter
-// ---------------------------------------
+// Play status
 
-void UI_UpdateHappiness(uint8_t happiness)
+void UI_UpdatePlay(uint8_t play)
 {
-    if (happiness > 100)
-        happiness = 100;
+    if (play > 100)
+        play = 100;
 
-    // Skip if value is unchanged
-    if (happiness == previousHappiness)
+    if (play == playValue)
         return;
 
-    // Store current value
-    previousHappiness = happiness;
+    playValue = play;
 
-    // Only draw if main screen is visible
     if (currentScreen == SCREEN_MAIN)
     {
-        UI_DrawMeter(270, happiness,
-                     ILI9341_COLOR_YELLOW);
+        UI_DrawBar(231, playValue,
+                   ILI9341_COLOR_YELLOW);
     }
 }
 
 
-// ---------------------------------------
-// Draw One Menu Option
-// ---------------------------------------
+// Sleep status
+
+void UI_UpdateSleep(uint8_t sleep)
+{
+    if (sleep > 100)
+        sleep = 100;
+
+    if (sleep == sleepValue)
+        return;
+
+    sleepValue = sleep;
+
+    if (currentScreen == SCREEN_MAIN)
+    {
+        UI_DrawBar(269, sleepValue,
+                   ILI9341_COLOR_BLUE);
+    }
+}
+
+
+// Draw one menu option
 
 static void UI_DrawMenuOption(uint8_t index,
                               uint8_t selected)
 {
     uint16_t y = 90 + index * 55;
 
-    // Clear only this option's region
     ILI9341_FillRect(20, y, 200, 40,
                      ILI9341_COLOR_BLACK);
 
     if (selected)
     {
-        // Highlight selected option
         ILI9341_FillRect(20, y, 200, 40,
                          ILI9341_COLOR_CYAN);
 
@@ -235,7 +216,6 @@ static void UI_DrawMenuOption(uint8_t index,
     }
     else
     {
-        // Draw unselected option
         ILI9341_DrawRect(20, y, 200, 40,
                          ILI9341_COLOR_WHITE);
 
@@ -247,9 +227,7 @@ static void UI_DrawMenuOption(uint8_t index,
 }
 
 
-// ---------------------------------------
-// Draw Full Menu Screen
-// ---------------------------------------
+// Menu screen
 
 void UI_DrawMenu(uint8_t selection)
 {
@@ -259,30 +237,24 @@ void UI_DrawMenu(uint8_t selection)
     currentScreen = SCREEN_MENU;
     menuSelection = selection;
 
-    // Full redraw only when entering menu
     ILI9341_FillScreen(ILI9341_COLOR_BLACK);
 
-    // Menu heading
     ILI9341_DrawString(55, 25, "PET MENU",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 2);
 
-    // Draw all three options
     for (uint8_t i = 0; i < 3; i++)
     {
         UI_DrawMenuOption(i, i == menuSelection);
     }
 
-    // Instructions
     ILI9341_DrawString(25, 285, "CENTER: SELECT",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 }
 
 
-// ---------------------------------------
-// Change Menu Selection
-// ---------------------------------------
+// Change menu selection
 
 static void UI_ChangeSelection(uint8_t newSelection)
 {
@@ -296,36 +268,25 @@ static void UI_ChangeSelection(uint8_t newSelection)
 
     menuSelection = newSelection;
 
-    // Redraw only the previous selection
     UI_DrawMenuOption(oldSelection, 0);
-
-    // Redraw only the new selection
     UI_DrawMenuOption(menuSelection, 1);
 }
 
 
-// ---------------------------------------
-// Return to Main Screen
-// ---------------------------------------
+// Return to main screen
 
 void UI_ReturnToMain(void)
 {
-    currentScreen = SCREEN_MAIN;
-
-    // Redraw using saved hunger/happiness
     UI_DrawMainScreen();
 }
 
 
-// ---------------------------------------
-// Read Joystick Buttons
-// ---------------------------------------
+// Read joystick
 
 static uint8_t UI_ReadJoystick(void)
 {
     uint8_t buttons = 0;
 
-    // Joystick signals are active low
     if (HAL_GPIO_ReadPin(JOY_UP_GPIO_Port,
                          JOY_UP_Pin) == GPIO_PIN_RESET)
     {
@@ -354,9 +315,7 @@ static uint8_t UI_ReadJoystick(void)
 }
 
 
-// ---------------------------------------
-// Process a Single Button Press
-// ---------------------------------------
+// Process button input
 
 static void UI_ProcessButton(uint8_t button)
 {
@@ -364,7 +323,6 @@ static void UI_ProcessButton(uint8_t button)
     {
         if (button == BTN_CENTER)
         {
-            // Open menu
             UI_DrawMenu(0);
         }
     }
@@ -372,106 +330,85 @@ static void UI_ProcessButton(uint8_t button)
     {
         if (button == BTN_UP)
         {
-            // Move selection up
             uint8_t next = (menuSelection + 2) % 3;
             UI_ChangeSelection(next);
         }
         else if (button == BTN_DOWN)
         {
-            // Move selection down
             uint8_t next = (menuSelection + 1) % 3;
             UI_ChangeSelection(next);
         }
         else if (button == BTN_CENTER)
         {
-            // Save the selected action
             if (menuSelection == 0)
                 pendingAction = UI_ACTION_FEED;
             else if (menuSelection == 1)
                 pendingAction = UI_ACTION_PLAY;
             else
-                pendingAction = UI_ACTION_THIRD;
+                pendingAction = UI_ACTION_SLEEP;
 
-            // Return to main screen
             UI_ReturnToMain();
         }
         else if (button == BTN_LEFT)
         {
-            // Exit menu without selecting
             UI_ReturnToMain();
         }
     }
 }
 
 
-// ---------------------------------------
-// Handle Joystick Input
-// ---------------------------------------
+// Handle joystick input
 
 void UI_HandleInput(void)
 {
     uint32_t currentTime = HAL_GetTick();
     uint8_t rawButtons = UI_ReadJoystick();
 
-    // Detect a change in raw input
     if (rawButtons != lastRawButtons)
     {
         lastRawButtons = rawButtons;
         lastInputTime = currentTime;
     }
 
-    // Wait until input has stabilized
     if ((uint32_t)(currentTime - lastInputTime)
             < DEBOUNCE_MS)
     {
         return;
     }
 
-    // No new stable input
     if (rawButtons == stableButtons)
         return;
 
     stableButtons = rawButtons;
 
-    // All buttons released: allow next press
     if (stableButtons == 0)
     {
         inputArmed = 1;
         return;
     }
 
-    // Process only one press per release
     if (inputArmed)
     {
         inputArmed = 0;
-
-        // Only individual buttons are handled
         UI_ProcessButton(stableButtons);
     }
 }
 
 
-// ---------------------------------------
-// Retrieve Selected Action
-// ---------------------------------------
+// Retrieve selected action
 
 UI_Action UI_GetAction(void)
 {
     UI_Action action = pendingAction;
-
-    // Clear pending action after reading
     pendingAction = UI_ACTION_NONE;
 
     return action;
 }
 
 
-// ---------------------------------------
-// Main UI Update Function
-// ---------------------------------------
+// Update interface
 
 void UI_Update(void)
 {
-    // Poll joystick without blocking
     UI_HandleInput();
 }
