@@ -19,7 +19,7 @@ static const Animation pet_anims[ANIM_COUNT] = {
     [ANIM_IDLE]    = { idle_frames,    4U,    250U,   true  },
     [ANIM_FEED]    = { feed_frames,    4U,    200U,   false },
     [ANIM_PLAY]    = { play_frames,    4U,    150U,   false },
-    [ANIM_ACTION3] = { sleep_frames,   4U,    400U,   true  },  /* sleep */
+    [ANIM_ACTION3] = { sleep_frames,   4U,    400U,   false  },  /* sleep */
     [ANIM_DEATH]   = { death_frames,   4U,    400U,   false },
     [ANIM_RUNAWAY] = { runaway_frames, 4U,    250U,   false },
 };
