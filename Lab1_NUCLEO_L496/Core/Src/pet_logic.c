@@ -210,3 +210,7 @@ int getHappiness(void) {
 int getHunger(void) {
     return hunger;
 }
+
+int getSleep(void) {
+    return sleep;
+}
