@@ -15,56 +15,26 @@ static void decay(void);
 static void CheckValues(void);
 static void CapValues(void);
 
-pet_Init(); // Initialize the pet
-
-while (1)
-  {
-    decay(); // Call the decay function to update hunger and happiness over time
-    int buttonPressed = //Joystick_Read(); // Read the joystick state
-
-    switch (pet_state) {
-        case IDLE:
-            pet_idle();
-            checkConditions(); // Check if hunger or happiness has reached 0 -> death or run away state
-            menu(buttonPressed); //menu opens if user presses menu button
-            break;
-
-        case FEED:
-            pet_feed();
-            checkConditions(); 
-            pet_state = IDLE; // Return to IDLE after feeding
-            break;
-
-        case PLAY:
-            pet_play();
-            checkConditions();
-            pet_state = IDLE; // Return to IDLE after playing
-            break;
-
-        case SLEEP:
-            pet_sleep();
-            checkConditions();
-            pet_state = IDLE; // Return to IDLE after sleeping
-            break;
-        default:
-            break;
-    }
-  }
-
 void Pet_Init(void) { //called at the start or when restarting the pet
     pet_state = IDLE;
     happiness = 100;
     hunger = 100;
+    sleep = 100;
 
     lastDecayTime = HAL_GetTick(); // Initialize the last decay time
 }
 
 void pet_idle(void) {
-    Anim_Play(ANIM_IDLE);
-    return;
+    animSound(); // Play idle animation and sound
+    if (anim_finished) {
+        return;
+    }
 }
 
 void menu(int buttonPressed) {
+    displayMenu(); // Display the menu screen
+
+    //do stuff with button presses
     if(buttonPressed == 1) {//right
         pet_state = FEED;
     } else if(buttonPressed == 2) {//left
@@ -80,27 +50,45 @@ void menu(int buttonPressed) {
 void pet_feed(void){
     hunger += 20;
     CapValues(); // Ensure hunger does not exceed 100
-    checkConditions(); // Check if hunger or happiness has reached 0
+    animSound(); // Play feeding animation and sound
+
+    if(anim_finshed){
+        return; 
+    }
+    //checkConditions(); // Check if hunger or happiness has reached 0
 }
 
 void pet_play(void){
     happiness += 20;
     CapValues(); // Ensure happiness does not exceed 100
-    checkConditions(); // Check if hunger or happiness has reached 0
+    animSound();
+
+    if(anim_finshed){
+        return; 
+    }
+    //checkConditions(); // Check if hunger or happiness has reached 0
 }
 
 void pet_sleep(void){
-    hunger -= 25;
-    happiness += 10;
-    CapValues(); // Ensure hunger and happiness do not exceed 100
-    checkConditions(); // Check if hunger or happiness has reached 0
+    sleep += 20;
+    CapValues(); // Ensure sleep does not exceed 100
+    animSound();
+
+    if(anim_finshed){
+        displayGames(); // Display the mini-game screen
+        if (buttonPressed()) {
+            startMiniGame();
+            return;
+        }
+    }
+   // checkConditions(); // Check if hunger or happiness has reached 0
 }
 
 void death(void) {
     animSound(); // Play death + animation
 
     if(anim_finshed){
-        display(); // Display the death screen or message and ask user to restart the game pressing any button?
+        displayDeath(); // Display the death screen or message and ask user to restart the game pressing any button?
         if (buttonPressed()) {
             Pet_Init(); // Reset the pet state and values
         }
@@ -111,7 +99,7 @@ void gone(void) {
     animSound(); // Play run away + animation
 
     if(anim_finshed){
-        display(); // Display the run away screen or message and ask user to restart the game pressing any button?
+        displayRunAway(); // Display the run away screen or message and ask user to restart the game pressing any button?
         if (buttonPressed()) {
             Pet_Init(); // Reset the pet state and values
         }
@@ -127,22 +115,27 @@ static void animSound(void) {
             break;
         case RUN_AWAY:
             Anim_Play(ANIM_RUNAWAY);
+            //add sound func
 
             break;
         case FEED:
             Anim_Play(ANIM_FEED);
+            //add sound func
 
             break;
         case PLAY:
             Anim_Play(ANIM_PLAY);
+            //add sound func
 
             break;
         case SLEEP:
             Anim_Play(ANIM_ACTION3);
+            //add sound func
 
             break;
         case IDLE:
             Anim_Play(ANIM_IDLE);
+            //add sound func
 
             break;
         default:
@@ -172,7 +165,7 @@ static void checkConditions(void) {
         death(); // Call the death function to handle pet death
     } else if (happiness <= 0) {
         pet_state = RUN_AWAY; // Set pet state to RUN_AWAY
-        gone(); 
+        gone();
     }else{
         return;
     }
@@ -189,6 +182,12 @@ static void CapValues(void) {
         happiness = 100; // Cap happiness at 100
     }else if (happiness < 0) {
         happiness = 0; // Ensure happiness does not go below 0
+    }
+
+    if (sleep > 100) {
+        sleep = 100; // Cap sleep at 100
+    }else if (sleep < 0) {
+        sleep = 0; // Ensure sleep does not go below 0
     }
 }
 
