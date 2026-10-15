@@ -16,6 +16,7 @@ void UI_ReturnToMain(void);
 
 void UI_UpdateHunger(void);
 void UI_UpdateHappiness(void);
+void UI_UpdateEnergy(void);
 
 void UI_DrawDeathScreen(void);
 void UI_DrawRunawayScreen(void);

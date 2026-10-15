@@ -3,14 +3,14 @@
 #include "ili9341.h"
 #include "gfx01m2_conf.h"
 
-#define BTN_UP      0x01
-#define BTN_DOWN    0x02
-#define BTN_LEFT    0x04
-#define BTN_CENTER  0x08
-#define BTN_RIGHT   0x10
+#define BTN_UP       0x01
+#define BTN_DOWN     0x02
+#define BTN_LEFT     0x04
+#define BTN_CENTER   0x08
+#define BTN_RIGHT    0x10
 
-#define DEBOUNCE_MS 30U
-#define MENU_COUNT 4U
+#define DEBOUNCE_MS  30U
+#define MENU_COUNT   4U
 #define GAME_MENU_COUNT 3U
 
 typedef enum {
@@ -29,6 +29,7 @@ static uint8_t menuSelection = 0;
 
 static int displayedHunger = -1;
 static int displayedHappiness = -1;
+static int displayedEnergy = -1;
 
 static uint8_t lastRawButtons = 0;
 static uint8_t stableButtons = 0;
@@ -56,8 +57,8 @@ void UI_GraphicsTest(void)
     ILI9341_FillScreen(ILI9341_COLOR_BLACK);
 
     ILI9341_DrawString(20, 20, "GRAPHICS TEST",
-                      ILI9341_COLOR_WHITE,
-                      ILI9341_COLOR_BLACK, 1);
+                       ILI9341_COLOR_WHITE,
+                       ILI9341_COLOR_BLACK, 1);
 
     ILI9341_FillRect(20, 70, 50, 40,
                      ILI9341_COLOR_RED);
@@ -118,8 +119,10 @@ static void UI_DrawBar(uint16_t y,
 void UI_DrawMainScreen(void)
 {
     currentScreen = SCREEN_MAIN;
+
     displayedHunger = -1;
     displayedHappiness = -1;
+    displayedEnergy = -1;
 
     ILI9341_FillScreen(ILI9341_COLOR_BLACK);
 
@@ -146,23 +149,17 @@ void UI_DrawMainScreen(void)
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 
-    ILI9341_DrawRect(20, 273, 200, 10,
-                     ILI9341_COLOR_WHITE);
-
-    ILI9341_DrawString(105, 274, "N/A",
-                       ILI9341_COLOR_GRAY,
-                       ILI9341_COLOR_BLACK, 1);
-
-    ILI9341_DrawString(20, 300, "CENTER: MENU R: GAMES",
+    ILI9341_DrawString(20, 300, "C: MENU R: GAMES",
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 
     UI_UpdateHunger();
     UI_UpdateHappiness();
+    UI_UpdateEnergy();
 }
 
 
-// Hunger and happiness
+// Hunger bar
 
 void UI_UpdateHunger(void)
 {
@@ -176,8 +173,12 @@ void UI_UpdateHunger(void)
 
     displayedHunger = hunger;
 
-    UI_DrawBar(203, hunger, ILI9341_COLOR_GREEN);
+    UI_DrawBar(203, hunger,
+               ILI9341_COLOR_GREEN);
 }
+
+
+// Happiness bar
 
 void UI_UpdateHappiness(void)
 {
@@ -191,11 +192,31 @@ void UI_UpdateHappiness(void)
 
     displayedHappiness = happiness;
 
-    UI_DrawBar(238, happiness, ILI9341_COLOR_YELLOW);
+    UI_DrawBar(238, happiness,
+               ILI9341_COLOR_YELLOW);
 }
 
 
-// Menu drawing
+// Energy / Sleep bar
+
+void UI_UpdateEnergy(void)
+{
+    if (currentScreen != SCREEN_MAIN)
+        return;
+
+    int energy = getEnergy();
+
+    if (energy == displayedEnergy)
+        return;
+
+    displayedEnergy = energy;
+
+    UI_DrawBar(273, energy,
+               ILI9341_COLOR_BLUE);
+}
+
+
+// Menu option
 
 static void UI_DrawMenuOption(uint8_t index,
                               uint8_t selected,
@@ -228,14 +249,15 @@ static void UI_DrawMenuOption(uint8_t index,
     }
 }
 
+
+// Change menu selection
+
 static void UI_ChangeSelection(uint8_t newSelection,
                                uint8_t count,
                                const char *options[])
 {
-    if (newSelection >= count)
-        return;
-
-    if (newSelection == menuSelection)
+    if (newSelection >= count ||
+        newSelection == menuSelection)
         return;
 
     uint8_t oldSelection = menuSelection;
@@ -244,6 +266,9 @@ static void UI_ChangeSelection(uint8_t newSelection,
     UI_DrawMenuOption(oldSelection, 0, options);
     UI_DrawMenuOption(menuSelection, 1, options);
 }
+
+
+// Pet menu
 
 void UI_DrawMenu(uint8_t selection)
 {
@@ -271,7 +296,7 @@ void UI_DrawMenu(uint8_t selection)
 }
 
 
-// Games menu
+// Game menu
 
 void UI_DrawGameMenu(uint8_t selection)
 {
@@ -298,6 +323,9 @@ void UI_DrawGameMenu(uint8_t selection)
                        ILI9341_COLOR_BLACK, 1);
 }
 
+
+// Shake game screen
+
 void UI_DrawShakeGame(void)
 {
     currentScreen = SCREEN_SHAKE;
@@ -316,6 +344,9 @@ void UI_DrawShakeGame(void)
                        ILI9341_COLOR_WHITE,
                        ILI9341_COLOR_BLACK, 1);
 }
+
+
+// Radio game screen
 
 void UI_DrawRadioGame(void)
 {
@@ -414,7 +445,7 @@ void UI_DrawRunawayScreen(void)
 }
 
 
-// Joystick
+// Read joystick
 
 static uint8_t UI_ReadJoystick(void)
 {
@@ -444,7 +475,7 @@ static uint8_t UI_ReadJoystick(void)
 }
 
 
-// Process buttons
+// Process input
 
 static void UI_ProcessButton(uint8_t button)
 {
@@ -497,9 +528,7 @@ static void UI_ProcessButton(uint8_t button)
 
             if (getPetState() == DEAD ||
                 getPetState() == RUN_AWAY)
-            {
                 return;
-            }
 
             UI_ReturnToMain();
         }
@@ -542,7 +571,7 @@ static void UI_ProcessButton(uint8_t button)
 }
 
 
-// Debounce input
+// Joystick debounce
 
 void UI_HandleInput(void)
 {
@@ -611,6 +640,7 @@ void UI_Update(void)
 
         UI_UpdateHunger();
         UI_UpdateHappiness();
+        UI_UpdateEnergy();
     }
     else if (state == MENU &&
              currentScreen == SCREEN_MAIN)

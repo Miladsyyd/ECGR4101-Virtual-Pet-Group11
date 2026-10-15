@@ -1,36 +1,47 @@
+
 #include "pet_logic.h"
 #include "main.h"
 #include <stdint.h>
-#define DECAY_INTERVAL 10000U // 10 seconds in milliseconds
+
+#define DECAY_INTERVAL 10000U
 
 PetState pet_state;
+
 static uint32_t lastDecayTime = 0;
 static int happiness;
 static int hunger;
+static int energy;
+
 static void decay(void);
 static void CheckValues(void);
 static void CapValues(void);
 
-void Pet_Init(void) { //called at the start or when restarting the pet
+void Pet_Init(void)
+{
     pet_state = IDLE;
     happiness = 100;
     hunger = 100;
+    energy = 100;
 
-    lastDecayTime = HAL_GetTick(); // Initialize the last decay time
+    lastDecayTime = HAL_GetTick();
 }
 
-void updatePetState(PetState newState) {
-    decay(); // Call the decay function to update hunger and happiness over time
+void updatePetState(PetState newState)
+{
+    if (pet_state == DEAD || pet_state == RUN_AWAY)
+        return;
 
-    if (newState != pet_state) {
-        
-        if (pet_state == DEAD || pet_state == RUN_AWAY){
-            return;// If the pet is dead or has run away, it cannot change state
-        }
+    decay();
 
-        pet_state = newState; // Update the pet state to the new state
+    if (pet_state == DEAD || pet_state == RUN_AWAY)
+        return;
 
-        switch (pet_state) {
+    if (newState != pet_state)
+    {
+        pet_state = newState;
+
+        switch (pet_state)
+        {
             case FEED:
                 pet_feed();
                 break;
@@ -49,100 +60,132 @@ void updatePetState(PetState newState) {
     }
 }
 
-void pet_idle(void) {
-    //idle animation
+void pet_idle(void)
+{
+    // Idle behavior
 }
 
-void pet_menu(void) {
-    // Logic for menu state, to be implemented
-    /*
-    can be used to display the menu options and handle user input for selecting actions
-    can go to FEED, PLAY or SLEEP
-    */
+void pet_menu(void)
+{
+    // Menu behavior
 }
 
-void pet_dead(void) {
-    // Pet remains dead until the game is restarted
+void pet_dead(void)
+{
+    // Dead state
 }
 
-void pet_run_away(void) {
-    //Pet remains gone until the game is restarted
+void pet_run_away(void)
+{
+    // Runaway state
 }
 
-void pet_feed(void){
+void pet_feed(void)
+{
     hunger += 20;
-    CapValues(); // Ensure hunger does not exceed 100
 
+    CapValues();
+    CheckValues();
 }
 
-void pet_play(void){
+void pet_play(void)
+{
     happiness += 20;
-    CapValues(); // Ensure happiness does not exceed 100
+    energy -= 10;
 
+    CapValues();
+    CheckValues();
 }
 
-void pet_sleep(void){
+void pet_sleep(void)
+{
     hunger -= 25;
     happiness += 10;
+    energy += 30;
 
-    CheckValues(); // Check if hunger or happiness has reached 0
-    CapValues(); // Ensure hunger and happiness do not exceed 100
-
+    CapValues();
+    CheckValues();
 }
 
-static void decay(void) {
+static void decay(void)
+{
     uint32_t currentTime = HAL_GetTick();
 
-    if (currentTime - lastDecayTime >= DECAY_INTERVAL) {
-        hunger -= 5; // Decrease hunger by 5
-        happiness -= 3; // Decrease happiness by 3
+    if ((uint32_t)(currentTime - lastDecayTime)
+            >= DECAY_INTERVAL)
+    {
+        hunger -= 5;
+        happiness -= 3;
+        energy -= 4;
 
-        CapValues(); // Ensure hunger and happiness do not exceed 100
-        CheckValues(); // Check if hunger or happiness has reached 0
+        CapValues();
+        CheckValues();
 
-        lastDecayTime = currentTime; // Update the last decay time
+        lastDecayTime = currentTime;
     }
 }
 
-
-static void CheckValues(void) {
-    if (hunger <= 0) {
-        pet_state = DEAD; // Pet dies if hunger reaches 0
-    } else if (happiness <= 0) {
-        pet_state = RUN_AWAY; // Pet runs away if happiness reaches 0
+static void CheckValues(void)
+{
+    if (hunger <= 0)
+    {
+        pet_state = DEAD;
+    }
+    else if (happiness <= 0)
+    {
+        pet_state = RUN_AWAY;
     }
 }
 
-static void CapValues(void) {
-    if (hunger > 100) {
-        hunger = 100; // Cap hunger at 100
-    }else if (hunger < 0) {
-        hunger = 0; // Ensure hunger does not go below 0
-    }
+static void CapValues(void)
+{
+    if (hunger > 100)
+        hunger = 100;
+    else if (hunger < 0)
+        hunger = 0;
 
-    if (happiness > 100) {
-        happiness = 100; // Cap happiness at 100
-    }else if (happiness < 0) {
-        happiness = 0; // Ensure happiness does not go below 0
-    }
+    if (happiness > 100)
+        happiness = 100;
+    else if (happiness < 0)
+        happiness = 0;
+
+    if (energy > 100)
+        energy = 100;
+    else if (energy < 0)
+        energy = 0;
 }
 
-void setPetState(PetState newState) {
-    if (pet_state != DEAD && pet_state != RUN_AWAY) {
-        if (newState == MENU || newState == FEED || newState == PLAY || newState == SLEEP || newState == IDLE) {
+void setPetState(PetState newState)
+{
+    if (pet_state != DEAD && pet_state != RUN_AWAY)
+    {
+        if (newState == MENU ||
+            newState == FEED ||
+            newState == PLAY ||
+            newState == SLEEP ||
+            newState == IDLE)
+        {
             pet_state = newState;
         }
     }
 }
 
-PetState getPetState(void) {
+PetState getPetState(void)
+{
     return pet_state;
 }
 
-int getHappiness(void) {
+int getHappiness(void)
+{
     return happiness;
 }
 
-int getHunger(void) {
+int getHunger(void)
+{
     return hunger;
+}
+
+int getEnergy(void)
+{
+    return energy;
 }
