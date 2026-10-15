@@ -482,10 +482,10 @@ static void UI_ProcessButton(uint8_t button)
 
             UI_ReturnToMain();
         }
-        else if (button == BTN_LEFT)
-        {
-            UI_ReturnToMain();
-        }
+       // else if (button == BTN_LEFT)
+     //   {
+     //       UI_ReturnToMain();
+     //   }
     }
     else if (currentScreen == SCREEN_GAME_MENU)
     {
@@ -531,7 +531,7 @@ static void UI_ProcessButton(uint8_t button)
 
 // Handle joystick
 
-void UI_HandleInput(void)
+static void UI_HandleInput(void)
 {
     uint32_t currentTime = HAL_GetTick();
     uint8_t rawButtons = UI_ReadJoystick();
