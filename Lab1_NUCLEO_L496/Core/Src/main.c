@@ -31,13 +31,19 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+#ifndef HAL_TIM_MODULE_ENABLED
+#define HAL_TIM_MODULE_ENABLED
+#endif
+
 #include "main.h"
+#include "stm32l4xx_hal_tim.h"
 #include "ili9341.h"
 #include "gfx01m2_conf.h"
 #include "anim.h"
 #include "pet_anims.h"
 #include "pet_sprites.h"
 #include "pet_logic.h"
+#include "pet_ui.h"
 #include "shake.h"
 #include "radio_game.h"
 #include "sound.h"
@@ -146,8 +152,9 @@ HAL_UART_Transmit(&hlpuart1,
   {
     Anim_Update(HAL_GetTick());
     Sound_Update();
-    UI_Update();
-    Pet_Update();
+    
+    Pet_Update(Joystick_Read());
+    HAL_Delay(10);
 
    
 
@@ -236,13 +243,11 @@ static void MX_TIM1_Init(void)
 /**
   * @brief  Fills the screen with a set of vertical color bars.
   */
-static void Demo_ColorBars(void)
-{
-  static const uint16_t colors[] =
-  {
+static void Demo_ColorBars(void){
+  static const uint16_t colors[] = {
     ILI9341_COLOR_WHITE, ILI9341_COLOR_YELLOW, ILI9341_COLOR_CYAN, ILI9341_COLOR_GREEN,
-    ILI9341_COLOR_MAGENTA, ILI9341_COLOR_RED, ILI9341_COLOR_BLUE, ILI9341_COLOR_ORANGE
-  };
+    ILI9341_COLOR_MAGENTA, ILI9341_COLOR_RED, ILI9341_COLOR_BLUE, ILI9341_COLOR_ORANGE};
+
   const uint16_t bar_count = sizeof(colors) / sizeof(colors[0]);
   const uint16_t bar_width = ILI9341_WIDTH / bar_count;
   uint16_t i;
