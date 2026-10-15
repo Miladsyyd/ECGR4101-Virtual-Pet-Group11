@@ -254,8 +254,9 @@ static void decay(void)
         int oldHunger = hunger;
         int oldHappiness = happiness;
 
-        hunger -= 5;
-        happiness -= 3;
+        hunger -= 15;
+        happiness -= 13;
+        sleep -=15;
         capValues();
         lastDecayTime = currentTime;
 
@@ -276,7 +277,7 @@ static void checkConditions(void)
 {
     if ((pet_state != DEAD) && (pet_state != RUN_AWAY))
     {
-        if (hunger == 0)
+        if (hunger == 0 || sleep == 0)
         {
             pet_state = DEAD;
         }
