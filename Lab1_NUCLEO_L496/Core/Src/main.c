@@ -135,9 +135,11 @@ HAL_UART_Transmit(&hlpuart1,
   /* Infinite loop: cycle through the demo pages */
   while (1)
   {
+    UI_Update();
+
     /*DAVID*/
-SHAKE_Update(&hi2c1, &shake);
-char shake_msg[160];
+  SHAKE_Update(&hi2c1, &shake);
+  char shake_msg[160];
 
 snprintf(shake_msg,
          sizeof(shake_msg),
@@ -155,7 +157,7 @@ HAL_UART_Transmit(&hlpuart1,
                   (uint8_t *)shake_msg,
                   strlen(shake_msg),
                   HAL_MAX_DELAY);
-/*DAVID*/
+/*DAVID
 RadioGame_Update(&hadc1,
                  &hlpuart1,
                  &radio);
@@ -169,17 +171,18 @@ RadioGame_Update(&hadc1,
 
     Demo_Text();
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    HAL_Delay(1500);
-/*MIIIIIIIIIIIILAD*/
+    HAL_Delay(1500); */
+/*MIIIIIIIIIIIILAD
     Demo_Bitmap();
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    HAL_Delay(3000);
-/*MIIIIIIIIIIIILAD*/
+    HAL_Delay(3000);*/
+/*MIIIIIIIIIIIILAD
     Demo_Anim();
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);*/
+    /*
     Demo_Joystick();
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-
+*/
 
   }
 }
