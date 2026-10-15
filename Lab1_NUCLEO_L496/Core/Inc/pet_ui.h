@@ -9,6 +9,9 @@ void UI_GraphicsTest(void);
 
 void UI_DrawMainScreen(void);
 void UI_DrawMenu(uint8_t selection);
+void UI_DrawGameMenu(uint8_t selection);
+void UI_DrawShakeGame(void);
+void UI_DrawRadioGame(void);
 void UI_ReturnToMain(void);
 
 void UI_UpdateHunger(void);
