@@ -30,13 +30,10 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
-/* Includes ------------------------------------------------------------------*/
-#ifndef HAL_TIM_MODULE_ENABLED
-#define HAL_TIM_MODULE_ENABLED
-#endif
 
+/*USER CODE BEGIN Init*/
+/* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "stm32l4xx_hal_tim.h"
 #include "ili9341.h"
 #include "gfx01m2_conf.h"
 #include "anim.h"
@@ -50,6 +47,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "stm32l4xx_hal_tim.h"
+
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
@@ -72,6 +71,11 @@ static void Demo_ColorBars(void);
 static void Demo_Shapes(void);
 static void Demo_Text(void);
 static void Demo_Joystick(void);
+static void RunShakeGame(I2C_HandleTypeDef *hi2c,
+                         UART_HandleTypeDef *huart);
+
+static void RunRadioGame(ADC_HandleTypeDef *hadc,
+                         UART_HandleTypeDef *huart);
 
 /*EDITED by Milad*******************************/
 
@@ -81,11 +85,11 @@ static void Demo_Joystick(void);
 /*EDITED by Milad*******************************/
 
 /* Joystick (B1) bit flags returned by Joystick_Read() */
-#define JOY_LEFT_MASK   PET_BUTTON_LEFT
-#define JOY_CENTER_MASK PET_BUTTON_CENTER
-#define JOY_DOWN_MASK   PET_BUTTON_DOWN
-#define JOY_RIGHT_MASK  PET_BUTTON_RIGHT
-#define JOY_UP_MASK     PET_BUTTON_UP
+#define JOY_LEFT_MASK   0x01
+#define JOY_CENTER_MASK 0x02
+#define JOY_DOWN_MASK   0x04
+#define JOY_RIGHT_MASK  0x08
+#define JOY_UP_MASK     0x10
 
 static uint8_t Joystick_Read(void)
 {
@@ -148,61 +152,104 @@ HAL_UART_Transmit(&hlpuart1,
 
  PetState lastPetState = IDLE;
  
-  while (1)
-  {
-    Anim_Update(HAL_GetTick());
-    Sound_Update();
-    
-    Pet_Update(Joystick_Read());
-    HAL_Delay(10);
+/*USER CODE END Init*/
 
-   
 
-    PetState currentPetState = getPetState();
+/*USER CODE BEGIN loop*/
+while (1)
+{
+  UI_DrawMainScreen();
+    UI_Update();
 
-   
-    if (currentPetState != lastPetState)
+    updatePetState(getPetState());
+
+    PetState state = getPetState();
+
+    if (state == PLAY)
     {
-      if (currentPetState == SHAKE_GAME)
-      {
-        memset(&shake, 0, sizeof(shake));
-        if (SHAKE_Init(&hi2c1) != HAL_OK)
-        {
-          Error_Handler();
-        }
-      }
-      else if (currentPetState == RADIO_GAME)
-      {
-        RadioGame_Init(&radio);
-      }
+        RunShakeGame(&hi2c1, &hlpuart1);
 
-      lastPetState = currentPetState;
-    }
+        /* reward successful play */
+        pet_play();
 
-   if (currentPetState == SHAKE_GAME)
-    {
-      if (SHAKE_Update(&hi2c1, &shake) != HAL_OK)
-      {
-        Error_Handler();
-      }
-      else if (shake.shake_flag != 0U)
-      {
-        Pet_GameComplete();
-      }
-    }
-    else if (currentPetState == RADIO_GAME)
-    {
-      RadioGame_Update(&hadc1, &hlpuart1, &radio);
-      if (radio.complete_flag != 0U)
-      {
-        Pet_GameComplete();
-      }
+        setPetState(IDLE);
+        UI_DrawMainScreen();
     }
 
     HAL_Delay(10);
-  }
+}
 }
    
+/*USER CODE END loop*/
+
+
+/*USER CODE BEGIN FUNC*/
+static void RunShakeGame(I2C_HandleTypeDef *hi2c,
+                         UART_HandleTypeDef *huart)
+{
+    SHAKE_Data shake = {0};
+
+    if (SHAKE_Init(hi2c) != HAL_OK)
+    {
+        Error_Handler();
+    }
+
+    while (1)
+    {
+        if (SHAKE_Update(hi2c, &shake) != HAL_OK)
+        {
+            Error_Handler();
+        }
+
+        char shake_msg[160];
+
+        snprintf(shake_msg,
+                 sizeof(shake_msg),
+                 "AX:%ld AY:%ld AZ:%ld | "
+                 "dX:%ld dY:%ld dZ:%ld | SHAKE:%d\r\n",
+                 (long)shake.x_mg,
+                 (long)shake.y_mg,
+                 (long)shake.z_mg,
+                 (long)shake.delta_x,
+                 (long)shake.delta_y,
+                 (long)shake.delta_z,
+                 shake.shake_flag);
+
+        HAL_UART_Transmit(huart,
+                          (uint8_t *)shake_msg,
+                          strlen(shake_msg),
+                          HAL_MAX_DELAY);
+
+        if (shake.shake_flag)
+        {
+            break;
+        }
+
+        HAL_Delay(50);
+    }
+}
+
+static void RunRadioGame(ADC_HandleTypeDef *hadc,
+                         UART_HandleTypeDef *huart)
+{
+    RadioGame_Data radio = {0};
+
+    RadioGame_Init(&radio);
+
+    while (1)
+    {
+        RadioGame_Update(hadc, huart, &radio);
+
+        if (radio.complete_flag)
+        {
+            break;
+        }
+
+        HAL_Delay(50);
+    }
+}
+
+
 static void MX_TIM1_Init(void)
 {
   TIM_OC_InitTypeDef sConfigOC = {0};
@@ -396,6 +443,7 @@ static void Demo_Joystick(void)
   }
 }
 
+/*USER CODE END Init*/
 /**
   * @brief Peripherals Common Clock Configuration
   * @retval None

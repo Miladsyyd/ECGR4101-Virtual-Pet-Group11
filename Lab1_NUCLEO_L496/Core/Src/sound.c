@@ -81,11 +81,18 @@ static void set_tone(uint16_t freq_hz)
 /* Call once after the timer is initialized. Starts PWM output, silent. */
 void Sound_Init(void)
 {
-    // Prescaler divides the timer clock down to 1 MHz (1 count = 1 us) 
-    __HAL_TIM_SET_PRESCALER(&htim1, (timer_clock_hz() / TICK_HZ) - 1U);
-    __HAL_TIM_GENERATE_EVENT(&htim1, TIM_EVENTSOURCE_UPDATE);
-    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);        // start silent 
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);               // enable PWM output on PE9 
+    /* Divide TIM1 clock down to 1 MHz */
+    __HAL_TIM_SET_PRESCALER(&htim1,
+        (timer_clock_hz() / TICK_HZ) - 1U);
+
+    /* Apply the new prescaler immediately */
+    HAL_TIM_GenerateEvent(&htim1, TIM_EVENTSOURCE_UPDATE);
+
+    /* Start silent */
+    __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, 0);
+
+    /* Enable PWM output on PE9 */
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 }
 
 // Starts a tune from its first note. Returns right away (does not wait). 
