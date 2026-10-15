@@ -1,8 +1,10 @@
 #include "radio_game.h"
+#include "sound.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 
 #define RADIO_TARGET_MIN      400
 #define RADIO_TARGET_MAX      3600
@@ -19,6 +21,7 @@ static uint8_t previous_channel = 255;
 
 static uint8_t radio_hold_active = 0;
 static uint32_t radio_hold_start_time = 0;
+static uint8_t previous_hint_flag = 0;
 
 void RadioGame_Init(RadioGame_Data *game)
 {
@@ -30,12 +33,12 @@ void RadioGame_Init(RadioGame_Data *game)
     game->complete_flag = 0;
 
     previous_channel = 255;
+
+    previous_hint_flag = 0;
+
     radio_hold_active = 0;
     radio_hold_start_time = 0;
 
-    /*
-     * Seed pseudo-random generator.
-     */
     srand(HAL_GetTick());
 
     radio_target =
@@ -47,16 +50,16 @@ void RadioGame_Init(RadioGame_Data *game)
         (radio_target * RADIO_CHANNEL_COUNT) / 4096;
 }
 
+
 void RadioGame_Update(ADC_HandleTypeDef *hadc,
                       UART_HandleTypeDef *huart,
                       RadioGame_Data *game)
 {
     char msg[120];
 
-    /*   
-       READ POTENTIOMETER
-          */
-
+    /*
+     * READ POTENTIOMETER
+     */
     HAL_ADC_Start(hadc);
 
     if (HAL_ADC_PollForConversion(hadc, 100) == HAL_OK)
@@ -70,10 +73,9 @@ void RadioGame_Update(ADC_HandleTypeDef *hadc,
     HAL_ADC_Stop(hadc);
 
 
-    /*   
-       DETERMINE RADIO CHANNEL
-          */
-
+    /*
+     * DETERMINE RADIO CHANNEL
+     */
     game->current_channel =
         (game->pot_raw * RADIO_CHANNEL_COUNT) / 4096;
 
@@ -102,10 +104,9 @@ void RadioGame_Update(ADC_HandleTypeDef *hadc,
     }
 
 
-    /*   
-       HINT FLAG
-          */
-
+    /*
+     * HINT FLAG
+     */
     if ((game->current_channel == target_channel) &&
         (game->complete_flag == 0))
     {
@@ -117,10 +118,22 @@ void RadioGame_Update(ADC_HandleTypeDef *hadc,
     }
 
 
-    /*   
-       DISTANCE FROM TARGET
-          */
+    /*
+     * Play hint sound only when entering
+     * the target channel.
+     */
+    if ((game->hint_flag == 1) &&
+        (previous_hint_flag == 0))
+    {
+        Sound_Play(SOUND_HAPPY);
+    }
 
+    previous_hint_flag = game->hint_flag;
+
+
+    /*
+     * DISTANCE FROM TARGET
+     */
     int32_t radio_error =
         (int32_t)game->pot_raw -
         (int32_t)radio_target;
@@ -131,10 +144,9 @@ void RadioGame_Update(ADC_HandleTypeDef *hadc,
     }
 
 
-    /*   
-       HOLD TIMER
-          */
-
+    /*
+     * HOLD TIMER
+     */
     if (game->complete_flag == 0)
     {
         if (radio_error <= RADIO_TOLERANCE)
@@ -142,9 +154,7 @@ void RadioGame_Update(ADC_HandleTypeDef *hadc,
             if (radio_hold_active == 0)
             {
                 radio_hold_active = 1;
-
-                radio_hold_start_time =
-                    HAL_GetTick();
+                radio_hold_start_time = HAL_GetTick();
 
                 const char tuning_msg[] =
                     "Good signal! Hold this tuning...\r\n";
@@ -176,7 +186,8 @@ void RadioGame_Update(ADC_HandleTypeDef *hadc,
             radio_hold_active = 0;
         }
     }
+}
 
 
    
-}
+

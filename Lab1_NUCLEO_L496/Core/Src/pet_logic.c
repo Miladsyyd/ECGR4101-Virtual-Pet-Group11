@@ -3,7 +3,7 @@
 #include "main.h"
 #include <stdint.h>
 
-#define DECAY_INTERVAL 10000U
+#define DECAY_INTERVAL 5000U
 
 PetState pet_state;
 
@@ -131,7 +131,7 @@ static void CheckValues(void)
     {
         pet_state = DEAD;
     }
-    else if (happiness <= 0)
+    else if (happiness <= 0 || energy <= 0)
     {
         pet_state = RUN_AWAY;
     }

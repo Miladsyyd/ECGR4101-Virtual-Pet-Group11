@@ -461,27 +461,35 @@ static void UI_ProcessButton(uint8_t button)
             UI_ChangeSelection((menuSelection + 1) % MENU_COUNT,
                                MENU_COUNT, menuOptions);
         }
-        else if (button == BTN_CENTER)
-        {
-            if (menuSelection == 0)
+            else if (button == BTN_CENTER)
             {
-                pendingAction = UI_ACTION_FEED;
+                if (menuSelection == 0)
+                {
+                    pendingAction = UI_ACTION_FEED;
+                    UI_ReturnToMain();
+                }
+                else if (menuSelection == 1)
+                {
+                    /*
+                    * PLAY -> Shake Game
+                    * main.c will draw the shake screen
+                    */
+                    pendingAction = UI_ACTION_PLAY;
+                }
+                else if (menuSelection == 2)
+                {
+                    /*
+                    * SLEEP -> Radio Game
+                    * main.c will draw the radio screen
+                    */
+                    pendingAction = UI_ACTION_SLEEP;
+                }
+                else
+                {
+                    pendingAction = UI_ACTION_BACK;
+                    UI_ReturnToMain();
+                }
             }
-            else if (menuSelection == 1)
-            {
-                pendingAction = UI_ACTION_PLAY;
-            }
-            else if (menuSelection == 2)
-            {
-                pendingAction = UI_ACTION_SLEEP;
-            }
-            else
-            {
-                pendingAction = UI_ACTION_BACK;
-            }
-
-            UI_ReturnToMain();
-        }
        // else if (button == BTN_LEFT)
      //   {
      //       UI_ReturnToMain();
@@ -581,4 +589,9 @@ UI_Action UI_GetAction(void)
 void UI_Update(void)
 {
     UI_HandleInput();
+}
+
+uint8_t UI_IsMainScreen(void)
+{
+    return (currentScreen == SCREEN_MAIN);
 }

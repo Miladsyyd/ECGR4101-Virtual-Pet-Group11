@@ -17,6 +17,7 @@ typedef enum
 } UI_Action;
 
 void UI_GraphicsTest(void);
+uint8_t UI_IsMainScreen(void);
 
 void UI_DrawMainScreen(void);
 void UI_DrawMenu(uint8_t selection);

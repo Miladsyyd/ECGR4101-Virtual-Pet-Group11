@@ -143,14 +143,30 @@ HAL_UART_Transmit(&hlpuart1,
   HAL_Delay(2000);
 
 /*Sorayda*/
-  Anim_Init(112, 60, PET_SPRITES_WIDTH, PET_SPRITES_HEIGHT, 3);
-  PetAnims_RegisterAll();
+Anim_Init(72, 60,
+          PET_SPRITES_WIDTH,
+          PET_SPRITES_HEIGHT,
+          3);
+
+PetAnims_RegisterAll();
+
+/* Start with idle animation */
+Anim_Play(ANIM_IDLE);
   Pet_Init();
+
+
+
+UI_DrawMainScreen();
  
   SHAKE_Data shake = {0};
   RadioGame_Data radio = {0};
 
  PetState lastPetState = IDLE;
+ PetState lastState = getPetState();
+
+uint8_t hungerWarningPlayed = 0;
+uint8_t energyWarningPlayed = 0;
+uint8_t happinessWarningPlayed = 0;
  
 /*USER CODE END Init*/
 
@@ -158,26 +174,232 @@ HAL_UART_Transmit(&hlpuart1,
 /*USER CODE BEGIN loop*/
 while (1)
 {
-  UI_DrawMainScreen();
-    UI_Update();
+    /*
+     * Keep sound progressing.
+     * This must be called continuously because Sound_Play()
+     * itself is non-blocking.
+     */
+    Sound_Update();
 
+    /*
+     * Process joystick/UI.
+     */
+    UI_Update();
+        PetState currentState = getPetState();
+    UI_UpdateFeed((uint8_t)getHunger());
+    UI_UpdatePlay((uint8_t)getHappiness());
+    UI_UpdateSleep((uint8_t)getEnergy());
+    /*
+     * Only update the pet animation while on the main screen.
+     */
+
+      PetState animState = getPetState();
+
+    if (UI_IsMainScreen() ||
+        animState == DEAD ||
+        animState == RUN_AWAY)
+    {
+        Anim_Update(HAL_GetTick());
+    }
+
+/*
+ * If a normal action animation finished,
+ * return to the looping idle animation.
+ */
+if (UI_IsMainScreen() &&
+    currentState != DEAD &&
+    currentState != RUN_AWAY)
+{
+    if (Anim_IsFinished())
+    {
+        AnimId currentAnim = Anim_Current();
+
+        if (currentAnim == ANIM_FEED ||
+            currentAnim == ANIM_PLAY ||
+            currentAnim == ANIM_ACTION3)
+        {
+            Anim_Play(ANIM_IDLE);
+        }
+    }
+}
+    /*
+     * Run stat decay.
+     */
     updatePetState(getPetState());
 
-    PetState state = getPetState();
+    UI_Action action = UI_GetAction();
 
-    if (state == PLAY)
-    {
+switch (action)
+{
+    case UI_ACTION_FEED:
+
+        Anim_Play(ANIM_FEED);
+        updatePetState(FEED);
+        Sound_Play(SOUND_HAPPY);
+
+        break;
+
+
+    case UI_ACTION_PLAY:
+
+        /* PLAY = SHAKE GAME */
+        UI_DrawShakeGame();
+
         RunShakeGame(&hi2c1, &hlpuart1);
 
-        /* reward successful play */
         pet_play();
+        setPetState(IDLE);
+
+        UI_DrawMainScreen();
+        Anim_Play(ANIM_PLAY);
+
+        Sound_Play(SOUND_HAPPY);
+
+        break;
+
+
+    case UI_ACTION_SLEEP:
+
+        /* SLEEP = RADIO GAME */
+        UI_DrawRadioGame();
+
+        RunRadioGame(&hadc1, &hlpuart1);
+
+        pet_sleep();
+        setPetState(IDLE);
+
+        UI_DrawMainScreen();
+        Anim_Play(ANIM_ACTION3);
+
+        Sound_Play(SOUND_HAPPY);
+
+        break;
+
+
+    case UI_ACTION_BACK:
 
         setPetState(IDLE);
+
         UI_DrawMainScreen();
+        Anim_Play(ANIM_IDLE);
+
+        break;
+
+
+    case UI_ACTION_RESTART:
+
+        Pet_Init();
+
+        hungerWarningPlayed = 0;
+        energyWarningPlayed = 0;
+        happinessWarningPlayed = 0;
+
+        UI_DrawMainScreen();
+        Anim_Play(ANIM_IDLE);
+
+        Sound_Play(SOUND_HAPPY);
+
+        break;
+
+
+    case UI_ACTION_NONE:
+    default:
+        break;
+}
+UI_UpdateFeed((uint8_t)getHunger());
+UI_UpdatePlay((uint8_t)getHappiness());
+UI_UpdateSleep((uint8_t)getEnergy());
+
+    /*
+     * --------------------------------------------------------
+     * LOW STAT SOUNDS
+     * --------------------------------------------------------
+     *
+     * These only trigger once when the stat becomes low.
+     *
+     * I'm using 25 as an example warning threshold.
+     */
+    if (getHunger() <= 25 && getHunger() > 0)
+    {
+        if (!hungerWarningPlayed)
+        {
+            Sound_Play(SOUND_HUNGRY);
+            hungerWarningPlayed = 1;
+        }
     }
+    else
+    {
+        /*
+         * Hunger recovered, so allow another warning
+         * if it drops below 25 again later.
+         */
+        hungerWarningPlayed = 0;
+    }
+
+
+    if (getEnergy() <= 25 && getEnergy() > 0)
+    {
+        if (!energyWarningPlayed)
+        {
+            Sound_Play(SOUND_CRITICAL_LOW);
+            energyWarningPlayed = 1;
+        }
+    }
+    else
+    {
+        energyWarningPlayed = 0;
+    }
+
+
+    if (getHappiness() <= 25 && getHappiness() > 0)
+    {
+        if (!happinessWarningPlayed)
+        {
+            Sound_Play(SOUND_CRITICAL_LOW);
+            happinessWarningPlayed = 1;
+        }
+    }
+    else
+    {
+        happinessWarningPlayed = 0;
+    }
+
+
+    /*
+     * --------------------------------------------------------
+     * DEATH / RUNAWAY SOUNDS
+     * --------------------------------------------------------
+     *
+     * Only react when the pet STATE CHANGES.
+     * Otherwise Sound_Play() would restart every loop.
+     */
+
+
+    if (currentState != lastState)
+    {
+        if (currentState == DEAD)
+        {
+            UI_DrawDeathScreen();
+            Anim_Play(ANIM_DEATH);
+
+            Sound_Play(SOUND_DYING);
+        }
+        else if (currentState == RUN_AWAY)
+        {
+            UI_DrawRunawayScreen();
+            Anim_Play(ANIM_RUNAWAY);
+
+            Sound_Play(SOUND_DYING);
+        }
+
+        lastState = currentState;
+    }
+
 
     HAL_Delay(10);
 }
+
+/* USER CODE END loop */
 }
    
 /*USER CODE END loop*/
