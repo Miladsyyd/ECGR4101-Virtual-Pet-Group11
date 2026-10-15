@@ -51,6 +51,7 @@ target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/Core/Src/shake.c
     ${CMAKE_SOURCE_DIR}/Core/Src/radio_game.c
     ${CMAKE_SOURCE_DIR}/Core/Src/pet_ui.c
+    ${CMAKE_SOURCE_DIR}/Core/Src/pet_logic.c
 )
 
 # Add include paths
