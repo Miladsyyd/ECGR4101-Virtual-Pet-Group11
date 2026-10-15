@@ -183,7 +183,6 @@ RadioGame_Update(&hadc1,
     Demo_Joystick();
     HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
 */
-
   }
 }
 
