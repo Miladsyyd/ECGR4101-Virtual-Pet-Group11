@@ -42,6 +42,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include "pet_ui.h"
+#include "pet_logic.h"
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
@@ -127,9 +129,8 @@ HAL_UART_Transmit(&hlpuart1,
 
   /* Initialize the LCD and show a splash screen */
   ILI9341_Init(&hspi1);
-  ILI9341_DrawString(18, 12, "GFX01M2 LCD DEMO", ILI9341_COLOR_WHITE, ILI9341_COLOR_BLACK, 2);
-  ILI9341_DrawString(30, 40, "NUCLEO-L496ZG-P", ILI9341_COLOR_CYAN, ILI9341_COLOR_BLACK, 1);
-  HAL_Delay(2000);
+  Pet_Init();
+  UI_DrawMainScreen();
 
   /* Infinite loop: cycle through the demo pages */
   while (1)
