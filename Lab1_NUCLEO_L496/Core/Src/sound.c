@@ -52,6 +52,12 @@ static const Note snd_dying[] = {
     {0, 0}         /* end of tune                                     */
 };
 
+/* CRITICAL LOW: one short, high-pitched beep to flag a low pet stat. */
+static const Note snd_critical_low[] = {
+    {880, 180},    /* A5 alert beep                                   */
+    {0, 0}          /* end of tune                                     */
+};
+
 /* Playback state: which tune is playing, which note we are on, and when that note began. */
 static const Note *cur_seq = 0;    /* pointer to the tune being played (0 = nothing playing) */
 static uint8_t  cur_idx = 0;       /* index of the current note within the tune              */
@@ -95,6 +101,7 @@ void Sound_Play(SoundId id)
     case SOUND_HAPPY:  cur_seq = snd_happy;  break;
     case SOUND_HUNGRY: cur_seq = snd_hungry; break;
     case SOUND_DYING:  cur_seq = snd_dying;  break;
+    case SOUND_CRITICAL_LOW: cur_seq = snd_critical_low; break;
     default:           Sound_Stop();         return;
     }
     cur_idx = 0;                          /* start at the first note */
