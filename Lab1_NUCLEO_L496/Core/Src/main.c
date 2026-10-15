@@ -146,9 +146,14 @@ HAL_UART_Transmit(&hlpuart1,
   {
     Anim_Update(HAL_GetTick());
     Sound_Update();
-    Pet_Update(Joystick_Read());
+    UI_Update();
+    Pet_Update();
+
+   
 
     PetState currentPetState = getPetState();
+
+   
     if (currentPetState != lastPetState)
     {
       if (currentPetState == SHAKE_GAME)
