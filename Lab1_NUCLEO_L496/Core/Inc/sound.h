@@ -7,8 +7,7 @@ typedef enum {
     SOUND_NONE = 0,
     SOUND_HAPPY,
     SOUND_HUNGRY,
-    SOUND_DYING,
-    SOUND_CRITICAL_LOW
+    SOUND_DYING
 } SoundId;
 
 // Call once after MX_TIM1_Init(). Starts PWM silent on TIM1_CH1 (PE9, Zio D6). 

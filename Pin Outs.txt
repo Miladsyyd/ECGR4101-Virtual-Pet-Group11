@@ -1,0 +1,54 @@
+Component	Zio pin	STM32 pin	Peripheral
+Force sensor	        A0	PA3	ADC1 channel 8
+Accelerometer SCL	D15	PB8	I2C1
+Accelerometer SDA	D14	PB9	I2C1
+Speaker	                D6	PE9     TIM1_CH1 (PWM)
+RGB LED red (optional)	D2	PF15	GPIO output
+RGB LED green (optional D4	PF14	GPIO output
+RGB LED blue (optional)	D7	PF13	GPIO output
+
+
+COMPONENT NOTES
+
+LCD DISPLAY
+  The display board sits on the top half of the male header pins, at the
+  ST-LINK USB end. Its LCD, joystick and flash pins are already set up in
+  the starter project, so we do not assign them. Do not reuse those pins.
+
+FORCE SENSOR           Zio A0 / PA3 / ADC1 channel 8
+  Wiring     3V3 -> force sensor -> node -> A0
+             node -> 10 kohm resistor -> GND
+  Reading    12-bit ADC, raw value 0-4095 (3.3 V reference).
+  Use        Squeeze = feed the pet.
+  Notes      Record the raw value at rest and at a hard squeeze, then set the
+             threshold between them. The video must show the raw value and
+             the interpreted value (squeeze level or percent).
+
+ACCELEROMETER          Zio D15 / PB8 = SCL, D14 / PB9 = SDA / I2C1
+  Wiring     VCC -> 3V3, GND -> GND, SCL -> D15, SDA -> D14
+  Use        Shake = play with the pet.
+  Notes      Read the ID register first to prove communication, then detect
+             shaking by threshold. If the breakout has no pull-up resistors,
+             add 4.7 kohm from SCL and SDA to 3V3.
+             TODO: part number and I2C address.
+
+SPEAKER                Zio D6 / PE9 / TIM1_CH1 (PWM)
+  Wiring     D6 -> small resistor or transistor -> speaker -> GND
+             (a pin cannot drive a speaker directly, about 20 mA max)
+  Use        Different tones for happy, hungry and dying.
+  Notes      Change the timer period and prescaler to change the pitch, and
+             set the duty cycle to about 50 percent.
+
+RGB LED (optional)     Zio D2 / PF15 = red, D4 / PF14 = green, D7 / PF13 = blue
+  Wiring     Each pin -> 330 ohm resistor -> LED color pin
+             Common pin -> GND (common cathode LED)
+  Use        Shows the pet's mood.
+  Notes      Plain on/off outputs, so no timer is needed. If the LED is
+             common anode, connect the common pin to 3V3 and invert the logic.
+
+ALL COMPONENTS
+  - Share a common GND.
+  - Keep everything at 3.3 V. Do not put 5 V on any pin.
+  - Before wiring, click each pin in the CubeMX Pinout view and confirm it is
+    unused (gray). The LED pins (PF15, PF14, PF13) are not verified yet.
+  - Avoid D11-D13, which are likely used for SPI by the starter project.
