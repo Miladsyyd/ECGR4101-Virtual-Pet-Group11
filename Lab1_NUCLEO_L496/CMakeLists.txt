@@ -45,6 +45,14 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    ${CMAKE_SOURCE_DIR}/Core/Src/anim.c
+    ${CMAKE_SOURCE_DIR}/Core/Src/pet_sprites.c
+    ${CMAKE_SOURCE_DIR}/Core/Src/pet_anims.c
+    ${CMAKE_SOURCE_DIR}/Core/Src/shake.c
+    ${CMAKE_SOURCE_DIR}/Core/Src/radio_game.c
+    ${CMAKE_SOURCE_DIR}/Core/Src/sound.c
+    ${CMAKE_SOURCE_DIR}/Core/Src/pet_ui.c
+    ${CMAKE_SOURCE_DIR}/Core/Src/pet_logic.c
 )
 
 # Add include paths

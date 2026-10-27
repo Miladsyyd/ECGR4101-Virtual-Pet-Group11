@@ -30,30 +30,66 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
+
+/*USER CODE BEGIN Init*/
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "ili9341.h"
 #include "gfx01m2_conf.h"
+#include "anim.h"
+#include "pet_anims.h"
+#include "pet_sprites.h"
+#include "pet_logic.h"
+#include "pet_ui.h"
+#include "shake.h"
+#include "radio_game.h"
+#include "sound.h"
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include "stm32l4xx_hal_tim.h"
+
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
+ADC_HandleTypeDef hadc1;
+I2C_HandleTypeDef hi2c1;
+UART_HandleTypeDef hlpuart1;
+TIM_HandleTypeDef htim1;
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_SPI1_Init(void);
+void PeriphCommonClock_Config(void);
+static void MX_LPUART1_UART_Init(void);
+static void MX_ADC1_Init(void);
+static void MX_I2C1_Init(void);
+static void MX_TIM1_Init(void);
 
 static void Demo_ColorBars(void);
 static void Demo_Shapes(void);
 static void Demo_Text(void);
 static void Demo_Joystick(void);
+static void RunShakeGame(I2C_HandleTypeDef *hi2c,
+                         UART_HandleTypeDef *huart);
+
+static void RunRadioGame(ADC_HandleTypeDef *hadc,
+                         UART_HandleTypeDef *huart);
+
+/*EDITED by Milad*******************************/
+
+   static void Demo_Bitmap(void);
+   static void Demo_Anim(void);
+
+/*EDITED by Milad*******************************/
 
 /* Joystick (B1) bit flags returned by Joystick_Read() */
-#define JOY_LEFT_MASK   (1U << 0)
-#define JOY_CENTER_MASK (1U << 1)
-#define JOY_DOWN_MASK   (1U << 2)
-#define JOY_RIGHT_MASK  (1U << 3)
-#define JOY_UP_MASK     (1U << 4)
+#define JOY_LEFT_MASK   0x01
+#define JOY_CENTER_MASK 0x02
+#define JOY_DOWN_MASK   0x04
+#define JOY_RIGHT_MASK  0x08
+#define JOY_UP_MASK     0x10
 
 static uint8_t Joystick_Read(void)
 {
@@ -80,10 +116,25 @@ int main(void)
 
   /* Configure the system clock */
   SystemClock_Config();
+  PeriphCommonClock_Config();
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI1_Init();
+  MX_ADC1_Init();
+  MX_I2C1_Init();
+  MX_LPUART1_UART_Init();
+  MX_TIM1_Init();
+  Sound_Init();
+
+
+  const char startup_msg[] = "\r\nUART STARTED\r\n";
+
+HAL_UART_Transmit(&hlpuart1,
+                  (uint8_t *)startup_msg,
+                  sizeof(startup_msg) - 1,
+                  HAL_MAX_DELAY);
+
 
   /* Initialize the LCD and show a splash screen */
   ILI9341_Init(&hspi1);
@@ -91,36 +142,381 @@ int main(void)
   ILI9341_DrawString(30, 40, "NUCLEO-L496ZG-P", ILI9341_COLOR_CYAN, ILI9341_COLOR_BLACK, 1);
   HAL_Delay(2000);
 
-  /* Infinite loop: cycle through the demo pages */
-  while (1)
+/*Sorayda*/
+Anim_Init(72, 60,
+          PET_SPRITES_WIDTH,
+          PET_SPRITES_HEIGHT,
+          3);
+
+PetAnims_RegisterAll();
+
+/* Start with idle animation */
+Anim_Play(ANIM_IDLE);
+  Pet_Init();
+
+
+
+UI_DrawMainScreen();
+ 
+  SHAKE_Data shake = {0};
+  RadioGame_Data radio = {0};
+
+ PetState lastPetState = IDLE;
+ PetState lastState = getPetState();
+
+uint8_t hungerWarningPlayed = 0;
+uint8_t energyWarningPlayed = 0;
+uint8_t happinessWarningPlayed = 0;
+ 
+/*USER CODE END Init*/
+
+
+/*USER CODE BEGIN loop*/
+while (1)
+{
+    /*
+     * Keep sound progressing.
+     * This must be called continuously because Sound_Play()
+     * itself is non-blocking.
+     */
+    Sound_Update();
+
+    /*
+     * Process joystick/UI.
+     */
+    UI_Update();
+        PetState currentState = getPetState();
+    UI_UpdateFeed((uint8_t)getHunger());
+    UI_UpdatePlay((uint8_t)getHappiness());
+    UI_UpdateSleep((uint8_t)getEnergy());
+    /*
+     * Only update the pet animation while on the main screen.
+     */
+
+      PetState animState = getPetState();
+
+    if (UI_IsMainScreen() ||
+        animState == DEAD ||
+        animState == RUN_AWAY)
+    {
+        Anim_Update(HAL_GetTick());
+    }
+
+/*
+ * If a normal action animation finished,
+ * return to the looping idle animation.
+ */
+if (UI_IsMainScreen() &&
+    currentState != DEAD &&
+    currentState != RUN_AWAY)
+{
+    if (Anim_IsFinished())
+    {
+        AnimId currentAnim = Anim_Current();
+
+        if (currentAnim == ANIM_FEED ||
+            currentAnim == ANIM_PLAY ||
+            currentAnim == ANIM_ACTION3)
+        {
+            Anim_Play(ANIM_IDLE);
+        }
+    }
+}
+    /*
+     * Run stat decay.
+     */
+    updatePetState(getPetState());
+
+    UI_Action action = UI_GetAction();
+
+switch (action)
+{
+    case UI_ACTION_FEED:
+
+        Anim_Play(ANIM_FEED);
+        updatePetState(FEED);
+        Sound_Play(SOUND_HAPPY);
+
+        break;
+
+
+    case UI_ACTION_PLAY:
+
+        /* PLAY = SHAKE GAME */
+        UI_DrawShakeGame();
+
+        RunShakeGame(&hi2c1, &hlpuart1);
+
+        pet_play();
+        setPetState(IDLE);
+
+        UI_DrawMainScreen();
+        Anim_Play(ANIM_PLAY);
+
+        Sound_Play(SOUND_HAPPY);
+
+        break;
+
+
+    case UI_ACTION_SLEEP:
+
+        /* SLEEP = RADIO GAME */
+        UI_DrawRadioGame();
+
+        RunRadioGame(&hadc1, &hlpuart1);
+
+        pet_sleep();
+        setPetState(IDLE);
+
+        UI_DrawMainScreen();
+        Anim_Play(ANIM_ACTION3);
+
+        Sound_Play(SOUND_HAPPY);
+
+        break;
+
+
+    case UI_ACTION_BACK:
+
+        setPetState(IDLE);
+
+        UI_DrawMainScreen();
+        Anim_Play(ANIM_IDLE);
+
+        break;
+
+
+    case UI_ACTION_RESTART:
+
+        Pet_Init();
+
+        hungerWarningPlayed = 0;
+        energyWarningPlayed = 0;
+        happinessWarningPlayed = 0;
+
+        UI_DrawMainScreen();
+        Anim_Play(ANIM_IDLE);
+
+        Sound_Play(SOUND_HAPPY);
+
+        break;
+
+
+    case UI_ACTION_NONE:
+    default:
+        break;
+}
+UI_UpdateFeed((uint8_t)getHunger());
+UI_UpdatePlay((uint8_t)getHappiness());
+UI_UpdateSleep((uint8_t)getEnergy());
+
+    /*
+     * --------------------------------------------------------
+     * LOW STAT SOUNDS
+     * --------------------------------------------------------
+     *
+     * These only trigger once when the stat becomes low.
+     *
+     * I'm using 25 as an example warning threshold.
+     */
+    if (getHunger() <= 25 && getHunger() > 0)
+    {
+        if (!hungerWarningPlayed)
+        {
+            Sound_Play(SOUND_HUNGRY);
+            hungerWarningPlayed = 1;
+        }
+    }
+    else
+    {
+        /*
+         * Hunger recovered, so allow another warning
+         * if it drops below 25 again later.
+         */
+        hungerWarningPlayed = 0;
+    }
+
+
+    if (getEnergy() <= 25 && getEnergy() > 0)
+    {
+        if (!energyWarningPlayed)
+        {
+            Sound_Play(SOUND_CRITICAL_LOW);
+            energyWarningPlayed = 1;
+        }
+    }
+    else
+    {
+        energyWarningPlayed = 0;
+    }
+
+
+    if (getHappiness() <= 25 && getHappiness() > 0)
+    {
+        if (!happinessWarningPlayed)
+        {
+            Sound_Play(SOUND_CRITICAL_LOW);
+            happinessWarningPlayed = 1;
+        }
+    }
+    else
+    {
+        happinessWarningPlayed = 0;
+    }
+
+
+    /*
+     * --------------------------------------------------------
+     * DEATH / RUNAWAY SOUNDS
+     * --------------------------------------------------------
+     *
+     * Only react when the pet STATE CHANGES.
+     * Otherwise Sound_Play() would restart every loop.
+     */
+
+
+    if (currentState != lastState)
+    {
+        if (currentState == DEAD)
+        {
+            UI_DrawDeathScreen();
+            Anim_Play(ANIM_DEATH);
+
+            Sound_Play(SOUND_DYING);
+        }
+        else if (currentState == RUN_AWAY)
+        {
+            UI_DrawRunawayScreen();
+            Anim_Play(ANIM_RUNAWAY);
+
+            Sound_Play(SOUND_DYING);
+        }
+
+        lastState = currentState;
+    }
+
+
+    HAL_Delay(10);
+}
+
+/* USER CODE END loop */
+}
+   
+/*USER CODE END loop*/
+
+
+/*USER CODE BEGIN FUNC*/
+static void RunShakeGame(I2C_HandleTypeDef *hi2c,
+                         UART_HandleTypeDef *huart)
+{
+    SHAKE_Data shake = {0};
+
+    if (SHAKE_Init(hi2c) != HAL_OK)
+    {
+        Error_Handler();
+    }
+
+    while (1)
+    {
+        if (SHAKE_Update(hi2c, &shake) != HAL_OK)
+        {
+            Error_Handler();
+        }
+
+        char shake_msg[160];
+
+        snprintf(shake_msg,
+                 sizeof(shake_msg),
+                 "AX:%ld AY:%ld AZ:%ld | "
+                 "dX:%ld dY:%ld dZ:%ld | SHAKE:%d\r\n",
+                 (long)shake.x_mg,
+                 (long)shake.y_mg,
+                 (long)shake.z_mg,
+                 (long)shake.delta_x,
+                 (long)shake.delta_y,
+                 (long)shake.delta_z,
+                 shake.shake_flag);
+
+        HAL_UART_Transmit(huart,
+                          (uint8_t *)shake_msg,
+                          strlen(shake_msg),
+                          HAL_MAX_DELAY);
+
+        if (shake.shake_flag)
+        {
+            break;
+        }
+
+        HAL_Delay(50);
+    }
+}
+
+static void RunRadioGame(ADC_HandleTypeDef *hadc,
+                         UART_HandleTypeDef *huart)
+{
+    RadioGame_Data radio = {0};
+
+    RadioGame_Init(&radio);
+
+    while (1)
+    {
+        RadioGame_Update(hadc, huart, &radio);
+
+        if (radio.complete_flag)
+        {
+            break;
+        }
+
+        HAL_Delay(50);
+    }
+}
+
+
+static void MX_TIM1_Init(void)
+{
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  __HAL_RCC_TIM1_CLK_ENABLE();
+
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 0;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 999;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
   {
-    Demo_ColorBars();
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    HAL_Delay(1500);
-
-    Demo_Shapes();
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    HAL_Delay(1500);
-
-    Demo_Text();
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
-    HAL_Delay(1500);
-
-    Demo_Joystick();
-    HAL_GPIO_TogglePin(LD2_GPIO_Port, LD2_Pin);
+    Error_Handler();
   }
+
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  __HAL_RCC_GPIOE_CLK_ENABLE();
+  GPIO_InitStruct.Pin = GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 }
 
 /**
   * @brief  Fills the screen with a set of vertical color bars.
   */
-static void Demo_ColorBars(void)
-{
-  static const uint16_t colors[] =
-  {
+static void Demo_ColorBars(void){
+  static const uint16_t colors[] = {
     ILI9341_COLOR_WHITE, ILI9341_COLOR_YELLOW, ILI9341_COLOR_CYAN, ILI9341_COLOR_GREEN,
-    ILI9341_COLOR_MAGENTA, ILI9341_COLOR_RED, ILI9341_COLOR_BLUE, ILI9341_COLOR_ORANGE
-  };
+    ILI9341_COLOR_MAGENTA, ILI9341_COLOR_RED, ILI9341_COLOR_BLUE, ILI9341_COLOR_ORANGE};
+
   const uint16_t bar_count = sizeof(colors) / sizeof(colors[0]);
   const uint16_t bar_width = ILI9341_WIDTH / bar_count;
   uint16_t i;
@@ -164,6 +560,84 @@ static void Demo_Text(void)
   ILI9341_DrawString(10, 160, "DEMO TEXT() IN MAIN.C", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
 }
 
+/*MIIIIIIIIIIIIIIIIIIIIIIIIIIIIIILAD*/
+
+   /**
+     * @brief  Tests ILI9341_DrawBitmap with a generated 48x48 image:
+     *         red, green and blue stripes, plus a white square in the
+     *         top-left corner to check orientation.
+     */
+   #define TEST_IMG_W 48U
+   #define TEST_IMG_H 48U
+   static uint16_t test_img[TEST_IMG_W * TEST_IMG_H];  /* static: 1 KB stack */
+
+   static void Demo_Bitmap(void)
+   {
+     uint16_t x, y;
+
+     for (y = 0; y < TEST_IMG_H; y++)
+     {
+       for (x = 0; x < TEST_IMG_W; x++)
+       {
+         uint16_t c;
+         if (y < 16U)      { c = ILI9341_COLOR_RED; }
+         else if (y < 32U) { c = ILI9341_COLOR_GREEN; }
+         else              { c = ILI9341_COLOR_BLUE; }
+         if ((x < 8U) && (y < 8U)) { c = ILI9341_COLOR_WHITE; }
+         test_img[y * TEST_IMG_W + x] = c;
+       }
+     }
+
+     ILI9341_FillScreen(ILI9341_COLOR_BLACK);
+     ILI9341_DrawString(10, 10, "BITMAP TEST", ILI9341_COLOR_WHITE, ILI9341_COLOR_BLACK, 2);
+     ILI9341_DrawBitmap(96, 100, TEST_IMG_W, TEST_IMG_H, test_img);
+     ILI9341_DrawString(10, 170, "RED/GRN/BLU, WHITE TOP-LEFT", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
+   }
+
+
+   /**
+  * @brief  Shows the real pet for 20 s. Idle by default; joystick:
+  *         CENTER = feed, RIGHT = play, LEFT = sleep,
+  *         UP = runaway, DOWN = death.
+  */
+static void Demo_Anim(void)
+{
+  uint32_t start = HAL_GetTick();
+  uint8_t prev_joy = 0;
+
+  ILI9341_FillScreen(ILI9341_COLOR_BLACK);
+  ILI9341_DrawString(10, 10, "ANIM TEST", ILI9341_COLOR_WHITE, ILI9341_COLOR_BLACK, 2);
+  ILI9341_DrawString(10, 40, "C=FEED R=PLAY L=SLEEP", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
+  ILI9341_DrawString(10, 55, "U=RUNAWAY D=DEATH", ILI9341_COLOR_YELLOW, ILI9341_COLOR_BLACK, 1);
+
+  Anim_Init(40, 90, PET_SPRITES_WIDTH, PET_SPRITES_HEIGHT, 5);   /* 32x32 drawn as 128x128, centered */  PetAnims_RegisterAll();
+  Anim_Play(ANIM_IDLE);
+
+  while ((HAL_GetTick() - start) < 20000U)
+  {
+    uint8_t joy = Joystick_Read();
+    uint8_t pressed = (uint8_t)(joy & (uint8_t)~prev_joy);  /* new presses only */
+    prev_joy = joy;
+
+    if      (pressed & JOY_CENTER_MASK) { Anim_Play(ANIM_FEED); }
+    else if (pressed & JOY_RIGHT_MASK)  { Anim_Play(ANIM_PLAY); }
+    else if (pressed & JOY_LEFT_MASK)   { Anim_Play(ANIM_ACTION3); }
+    else if (pressed & JOY_UP_MASK)     { Anim_Play(ANIM_RUNAWAY); }
+    else if (pressed & JOY_DOWN_MASK)   { Anim_Play(ANIM_DEATH); }
+
+    /* Feed and play return to idle; death and runaway stay on their last frame */
+    if (Anim_IsFinished() &&
+        ((Anim_Current() == ANIM_FEED) || (Anim_Current() == ANIM_PLAY)))
+    {
+      Anim_Play(ANIM_IDLE);
+    }
+
+    Anim_Update(HAL_GetTick());
+  }
+}
+
+
+
 /**
   * @brief  Live joystick (B1) status readout for a few seconds.
   */
@@ -190,6 +664,183 @@ static void Demo_Joystick(void)
     HAL_Delay(50);
   }
 }
+
+/*USER CODE END Init*/
+/**
+  * @brief Peripherals Common Clock Configuration
+  * @retval None
+  */
+void PeriphCommonClock_Config(void)
+{
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+
+  /** Initializes the peripherals clock
+  */
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USB|RCC_PERIPHCLK_ADC;
+  PeriphClkInit.AdcClockSelection = RCC_ADCCLKSOURCE_PLLSAI1;
+  PeriphClkInit.UsbClockSelection = RCC_USBCLKSOURCE_PLLSAI1;
+  PeriphClkInit.PLLSAI1.PLLSAI1Source = RCC_PLLSOURCE_MSI;
+  PeriphClkInit.PLLSAI1.PLLSAI1M = 5;
+  PeriphClkInit.PLLSAI1.PLLSAI1N = 20;
+  PeriphClkInit.PLLSAI1.PLLSAI1P = RCC_PLLP_DIV2;
+  PeriphClkInit.PLLSAI1.PLLSAI1Q = RCC_PLLQ_DIV2;
+  PeriphClkInit.PLLSAI1.PLLSAI1R = RCC_PLLR_DIV2;
+  PeriphClkInit.PLLSAI1.PLLSAI1ClockOut = RCC_PLLSAI1_48M2CLK|RCC_PLLSAI1_ADC1CLK;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_MultiModeTypeDef multimode = {0};
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+
+  /** Common config
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.ScanConvMode = ADC_SCAN_DISABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  hadc1.Init.LowPowerAutoWait = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
+  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
+  hadc1.Init.OversamplingMode = DISABLE;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure the ADC multi-mode
+  */
+  multimode.Mode = ADC_MODE_INDEPENDENT;
+  if (HAL_ADCEx_MultiModeConfigChannel(&hadc1, &multimode) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Regular Channel
+  */
+  sConfig.Channel = ADC_CHANNEL_8;
+  sConfig.Rank = ADC_REGULAR_RANK_1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
+  sConfig.SingleDiff = ADC_SINGLE_ENDED;
+  sConfig.OffsetNumber = ADC_OFFSET_NONE;
+  sConfig.Offset = 0;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.Timing = 0x00201A25;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.OwnAddress2Masks = I2C_OA2_NOMASK;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Analogue filter
+  */
+  if (HAL_I2CEx_ConfigAnalogFilter(&hi2c1, I2C_ANALOGFILTER_ENABLE) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Digital filter
+  */
+  if (HAL_I2CEx_ConfigDigitalFilter(&hi2c1, 0) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief LPUART1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_LPUART1_UART_Init(void)
+{
+
+  /* USER CODE BEGIN LPUART1_Init 0 */
+
+  /* USER CODE END LPUART1_Init 0 */
+
+  /* USER CODE BEGIN LPUART1_Init 1 */
+
+  /* USER CODE END LPUART1_Init 1 */
+  hlpuart1.Instance = LPUART1;
+  hlpuart1.Init.BaudRate = 115200;
+  hlpuart1.Init.WordLength = UART_WORDLENGTH_8B;
+  hlpuart1.Init.StopBits = UART_STOPBITS_1;
+  hlpuart1.Init.Parity = UART_PARITY_NONE;
+  hlpuart1.Init.Mode = UART_MODE_TX_RX;
+  hlpuart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  hlpuart1.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+  hlpuart1.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+  if (HAL_UART_Init(&hlpuart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN LPUART1_Init 2 */
+
+  /* USER CODE END LPUART1_Init 2 */
+
+}
+
 
 /**
   * @brief SPI1 Initialization Function
